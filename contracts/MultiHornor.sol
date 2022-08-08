@@ -127,7 +127,7 @@ contract MultiHornor_V1 is IMultiHornor, AccessControlUpgradeable {
 
     function setK(uint256 k_) external {
         _checkRole(ROLE_SET_POC);
-        k - k_;
+        k = k_;
     }
 
     // @dev cover Poc point
