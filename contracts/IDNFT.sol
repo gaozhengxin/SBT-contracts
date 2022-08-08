@@ -13,8 +13,17 @@ contract IDNFT_v1 is ERC721EnumerableUpgradeable,OwnableUpgradeable {
 
     uint256 public tokenId;
 
-    function claim() external {
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal virtual override {
+        super._beforeTokenTransfer(from, to, tokenId);
+
         require(balanceOf(msg.sender) == 0);
+    }
+
+    function claim() external {
         _mint(msg.sender, tokenId);
         tokenId++;
     }

@@ -20,6 +20,7 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
     bytes32 public constant ROLE_ADD_POC = keccak256("ROLE_ADD_POC");
     bytes32 public constant ROLE_SET_POC = keccak256("ROLE_SET_POC");
     bytes32 public constant ROLE_SET_VEPOWER = keccak256("ROLE_SET_VEPOWER");
+    bytes32 public constant ROLE_ADD_EVENT = keccak256("ROLE_ADD_EVENT");
     bytes32 public constant ROLE_SET_EVENT = keccak256("ROLE_SET_EVENT");
 
     function __initRole() internal {
@@ -27,6 +28,7 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
         _setupRole(ROLE_ADD_POC, msg.sender);
         _setupRole(ROLE_SET_POC, msg.sender);
         _setupRole(ROLE_SET_VEPOWER, msg.sender);
+        _setupRole(ROLE_ADD_EVENT, msg.sender);
         _setupRole(ROLE_SET_EVENT, msg.sender);
     }
 
@@ -154,15 +156,22 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
 
     // @dev increase VE power
     function setVEPower(uint256[] calldata ids, uint64[] calldata vePower) external {
-        _checkRole(ROLE_SET_EVENT);
+        _checkRole(ROLE_SET_VEPOWER);
         for (uint i = 0; i < ids.length; i++) {
             info[ids[i]].VEPower = vePower[i];
         }
     }
 
+    function setEventPower(uint256[] calldata ids, uint64[] calldata eventPower) external {
+        _checkRole(ROLE_SET_EVENT);
+        for (uint i = 0; i < ids.length; i++) {
+            info[ids[i]].EventPower = eventPower[i];
+        }
+    }
+
     // @dev increase event power
     function addEventPower(uint256[] calldata ids, uint64[] calldata eventPower) external {
-        _checkRole(ROLE_SET_POC);
+        _checkRole(ROLE_ADD_EVENT);
         for (uint i = 0; i < ids.length; i++) {
             uint64 eventPower_ = this.EventPower(ids[i]) + eventPower[i];
             info[ids[i]].EventPower = eventPower_;
@@ -172,7 +181,7 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
     function updateAll(uint256[] calldata ids, uint64[] calldata poc, uint64 time, uint64[] calldata vePower, uint64[] calldata eventPower) external {
         _checkRole(ROLE_ADD_POC);
         _checkRole(ROLE_SET_VEPOWER);
-        _checkRole(ROLE_SET_EVENT);
+        _checkRole(ROLE_ADD_EVENT);
         for (uint i = 0; i < ids.length; i++) {
             require(time >= info[ids[i]].Timestamp);
             uint64 poc_ = this.POC(ids[i], uint256(time)) + poc[i];
