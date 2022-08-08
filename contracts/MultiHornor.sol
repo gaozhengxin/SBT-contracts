@@ -116,7 +116,7 @@ contract MultiHornor_V1 is IMultiHornor, AccessControlUpgradeable {
         }
     }
 
-    uint256 public weight_poc = 100;
+    uint256 public weight_poc = 300;
     uint256 public weight_vepower = 600;
     uint256 public weight_event = 100;
 
@@ -151,20 +151,31 @@ contract MultiHornor_V1 is IMultiHornor, AccessControlUpgradeable {
     }
 
     // @dev increase VE power
-    function setVEPower(uint256[] calldata ids, uint64[] calldata vePower, uint64 time) external {
-        _checkRole(ROLE_SET_POC);
-        require(uint256(time) <= block.timestamp);
+    function setVEPower(uint256[] calldata ids, uint64[] calldata vePower) external {
+        _checkRole(ROLE_SET_EVENT);
         for (uint i = 0; i < ids.length; i++) {
             _VEPowerOfNFT[ids[i]] = vePower[i];
         }
     }
 
     // @dev increase event power
-    function setEventPower(uint256[] calldata ids, uint64[] calldata eventPower, uint64 time) external {
+    function addEventPower(uint256[] calldata ids, uint64[] calldata eventPower) external {
         _checkRole(ROLE_SET_POC);
-        require(uint256(time) <= block.timestamp);
         for (uint i = 0; i < ids.length; i++) {
-            _EventPowerOfNFT[ids[i]] = eventPower[i];
+            _EventPowerOfNFT[ids[i]] += eventPower[i];
+        }
+    }
+
+    function updateAll(uint256[] calldata ids, uint64[] calldata poc, uint64 time, uint64[] calldata vePower, uint64[] calldata eventPower) external {
+        _checkRole(ROLE_ADD_POC);
+        _checkRole(ROLE_SET_VEPOWER);
+        _checkRole(ROLE_SET_EVENT);
+        for (uint i = 0; i < ids.length; i++) {
+            require(time >= _pocOfNFT[ids[i]].Timestamp);
+            uint64 poc = this.POC(ids[i], uint256(time)) + poc[i];
+            _pocOfNFT[ids[i]] = PocPoint(poc, time);
+            _VEPowerOfNFT[ids[i]] = vePower[i];
+            _EventPowerOfNFT[ids[i]] += eventPower[i];
         }
     }
 }
