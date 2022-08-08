@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
-interface IMultiHornor {
+interface IMultiHonor {
     function POC(uint256 tokenId) view external returns(uint64);
     function VEPower(uint256 tokenId) view external returns(uint64);
     function EventPower(uint256 tokenId) view external returns(uint64);
@@ -9,7 +9,7 @@ interface IMultiHornor {
     function Level(uint256 tokenId) view external returns(uint8);
 }
 
-contract MultiHornor_V1 is IMultiHornor, AccessControlUpgradeable {
+contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
     function initialize() public initializer {
         __AccessControl_init_unchained();
         __initRole();
@@ -120,7 +120,7 @@ contract MultiHornor_V1 is IMultiHornor, AccessControlUpgradeable {
     uint256 public weight_vepower = 600;
     uint256 public weight_event = 100;
 
-    // returns user's total hornor
+    // returns user's total honor
     function Total(uint256 tokenId) override view external returns(uint64) {
         return uint64((this.POC(tokenId) * weight_poc + this.VEPower(tokenId) * weight_vepower + this.EventPower(tokenId) * tokenId) / (weight_poc + weight_vepower + weight_event));
     }
