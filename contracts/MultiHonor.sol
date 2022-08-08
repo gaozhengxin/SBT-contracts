@@ -57,14 +57,14 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
         _setupRole(ROLE_SET_EVENT, to);
     }
 
-    struct PocPoint {
-        uint64 Value;
+    struct Info {
+        uint64 POC;
         uint64 Timestamp;
+        uint64 VEPower;
+        uint64 EventPower;
     }
 
-    mapping(uint256 => PocPoint) private _pocOfNFT;
-    mapping(uint256 => uint64) public _VEPowerOfNFT;
-    mapping(uint256 => uint64) public _EventPowerOfNFT;
+    mapping(uint256 => Info) private info;
 
     uint256 public k;
     uint256 constant k_denominator = 1000000;
@@ -72,9 +72,9 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
 
     // returns user's POC at a specific time after checkpoint
     function POC(uint256 tokenId, uint256 time) view external returns(uint64) {
-        return uint64(uint256(_pocOfNFT[tokenId].Value) - uint256(time - _pocOfNFT[tokenId].Timestamp) * k / k_denominator);
+        return uint64(uint256(info[tokenId].POC) - uint256(time - info[tokenId].Timestamp) * k / k_denominator);
         // Non linear attenuation
-        // return p / (time - (_pocOfNFT[tokenId].Timestamp - p / _pocOfNFT[tokenId].Value));
+        // return p / (time - (info[tokenId].Timestamp - p / info[tokenId].POC));
     }
 
     // returns user's current POC
@@ -84,11 +84,11 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
 
     // returns user's current VEPower
     function VEPower(uint256 tokenId) override view external returns(uint64) {
-        return _VEPowerOfNFT[tokenId];
+        return info[tokenId].VEPower;
     }
     // returns user's current EventPower
     function EventPower(uint256 tokenId) override view external returns(uint64) {
-        return _EventPowerOfNFT[tokenId];
+        return info[tokenId].EventPower;
     }
 
     uint64 public level_5 = 200000;
@@ -135,7 +135,8 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
         _checkRole(ROLE_SET_POC);
         require(uint256(time) <= block.timestamp);
         for (uint i = 0; i < ids.length; i++) {
-            _pocOfNFT[ids[i]] = PocPoint(poc[i], time);
+            info[ids[i]].POC = poc[i];
+            info[ids[i]].Timestamp = time;
         }
     }
 
@@ -144,9 +145,10 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
         _checkRole(ROLE_ADD_POC);
         require(uint256(time) <= block.timestamp);
         for (uint i = 0; i < ids.length; i++) {
-            require(time >= _pocOfNFT[ids[i]].Timestamp);
-            uint64 poc = this.POC(ids[i], uint256(time)) + poc[i];
-            _pocOfNFT[ids[i]] = PocPoint(poc, time);
+            require(time >= info[ids[i]].Timestamp);
+            uint64 poc_ = this.POC(ids[i], uint256(time)) + poc[i];
+            info[ids[i]].POC = poc_;
+            info[ids[i]].Timestamp = time;
         }
     }
 
@@ -154,7 +156,7 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
     function setVEPower(uint256[] calldata ids, uint64[] calldata vePower) external {
         _checkRole(ROLE_SET_EVENT);
         for (uint i = 0; i < ids.length; i++) {
-            _VEPowerOfNFT[ids[i]] = vePower[i];
+            info[ids[i]].VEPower = vePower[i];
         }
     }
 
@@ -162,7 +164,8 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
     function addEventPower(uint256[] calldata ids, uint64[] calldata eventPower) external {
         _checkRole(ROLE_SET_POC);
         for (uint i = 0; i < ids.length; i++) {
-            _EventPowerOfNFT[ids[i]] += eventPower[i];
+            uint64 eventPower_ = this.EventPower(ids[i]) + eventPower[i];
+            info[ids[i]].EventPower = eventPower_;
         }
     }
 
@@ -171,11 +174,10 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
         _checkRole(ROLE_SET_VEPOWER);
         _checkRole(ROLE_SET_EVENT);
         for (uint i = 0; i < ids.length; i++) {
-            require(time >= _pocOfNFT[ids[i]].Timestamp);
-            uint64 poc = this.POC(ids[i], uint256(time)) + poc[i];
-            _pocOfNFT[ids[i]] = PocPoint(poc, time);
-            _VEPowerOfNFT[ids[i]] = vePower[i];
-            _EventPowerOfNFT[ids[i]] += eventPower[i];
+            require(time >= info[ids[i]].Timestamp);
+            uint64 poc_ = this.POC(ids[i], uint256(time)) + poc[i];
+            uint64 eventPower_ = this.EventPower(ids[i]) + eventPower[i];
+            info[ids[i]] = Info(poc_, time, vePower[i], eventPower_);
         }
     }
 }
