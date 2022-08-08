@@ -67,8 +67,8 @@ contract MultiHornor_V1 is IMultiHornor, AccessControlUpgradeable {
     mapping(uint256 => uint64) public _EventPowerOfNFT;
 
     uint256 public k;
-    uint256 public k_denominator = 1000000;
-    uint256 public p = 1000000000;
+    uint256 constant k_denominator = 1000000;
+    // uint256 constant p = 1000000000;
 
     // returns user's POC at a specific time after checkpoint
     function POC(uint256 tokenId, uint256 time) view external returns(uint64) {
