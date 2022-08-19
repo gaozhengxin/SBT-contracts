@@ -4,8 +4,9 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 interface IMultiHonor {
     function POC(uint256 tokenId) view external returns(uint64);
     function VEPower(uint256 tokenId) view external returns(uint64);
-    function EventPower(uint256 tokenId) view external returns(uint64);
-    function Total(uint256 tokenId) view external returns(uint64); 
+    function VEPoint(uint256 tokenId) view external returns(uint64);
+    function EventPoint(uint256 tokenId) view external returns(uint64);
+    function TotalPoint(uint256 tokenId) view external returns(uint64); 
     function Level(uint256 tokenId) view external returns(uint8);
 }
 
@@ -63,7 +64,7 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
         uint64 POC;
         uint64 Timestamp;
         uint64 VEPower;
-        uint64 EventPower;
+        uint64 EventPoint;
     }
 
     mapping(uint256 => Info) private info;
@@ -81,16 +82,22 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
 
     // returns user's current POC
     function POC(uint256 tokenId) override view external returns(uint64) {
-        return this.POC(tokenId, block.timestamp);
+        return POC(tokenId, block.timestamp);
     }
 
     // returns user's current VEPower
     function VEPower(uint256 tokenId) override view external returns(uint64) {
         return info[tokenId].VEPower;
     }
-    // returns user's current EventPower
-    function EventPower(uint256 tokenId) override view external returns(uint64) {
-        return info[tokenId].EventPower;
+
+    // returns user's current VEPoint
+    function VEPoint(uint256 tokenId) override view external returns(uint64) {
+        return vePower2vePoint(VEPower(tokenId));
+    }
+
+    // returns user's current EventPoint
+    function EventPoint(uint256 tokenId) override view external returns(uint64) {
+        return info[tokenId].EventPoint;
     }
 
     uint64 public level_5 = 200000;
@@ -101,30 +108,31 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
 
     // returns user's level
     function Level(uint256 tokenId) override view external returns(uint8) {
-        if (this.Total(tokenId) > level_5) {
+        if (TotalPoint(tokenId) > level_5) {
             return 5;
         }
-        if (this.Total(tokenId) > level_4) {
+        if (TotalPoint(tokenId) > level_4) {
             return 4;
         }
-        if (this.Total(tokenId) > level_3) {
+        if (TotalPoint(tokenId) > level_3) {
             return 3;
         }
-        if (this.Total(tokenId) > level_2) {
+        if (TotalPoint(tokenId) > level_2) {
             return 2;
         }
-        if (this.Total(tokenId) > level_1) {
+        if (TotalPoint(tokenId) > level_1) {
             return 1;
         }
+        return 0;
     }
 
-    uint256 public weight_poc = 300;
-    uint256 public weight_vepower = 600;
+    uint256 public weight_poc = 600;
+    uint256 public weight_vepoint = 300;
     uint256 public weight_event = 100;
 
     // returns user's total honor
-    function Total(uint256 tokenId) override view external returns(uint64) {
-        return uint64((this.POC(tokenId) * weight_poc + this.VEPower(tokenId) * weight_vepower + this.EventPower(tokenId) * tokenId) / (weight_poc + weight_vepower + weight_event));
+    function TotalPoint(uint256 tokenId) override view external returns(uint64) {
+        return uint64((POC(tokenId) * weight_poc + VEPoint(tokenId) * weight_vepoint + EventPoint(tokenId) * tokenId) / (weight_poc + weight_vepoint + weight_event));
     }
 
     function setK(uint256 k_) external {
@@ -148,7 +156,7 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
         require(uint256(time) <= block.timestamp);
         for (uint i = 0; i < ids.length; i++) {
             require(time >= info[ids[i]].Timestamp);
-            uint64 poc_ = this.POC(ids[i], uint256(time)) + poc[i];
+            uint64 poc_ = POC(ids[i], uint256(time)) + poc[i];
             info[ids[i]].POC = poc_;
             info[ids[i]].Timestamp = time;
         }
@@ -162,31 +170,53 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
         }
     }
 
-    function setEventPower(uint256[] calldata ids, uint64[] calldata eventPower) external {
+    function setEventPoint(uint256[] calldata ids, uint64[] calldata eventPower) external {
         _checkRole(ROLE_SET_EVENT);
         for (uint i = 0; i < ids.length; i++) {
-            info[ids[i]].EventPower = eventPower[i];
+            info[ids[i]].EventPoint = eventPower[i];
         }
     }
 
     // @dev increase event power
-    function addEventPower(uint256[] calldata ids, uint64[] calldata eventPower) external {
+    function addEventPoint(uint256[] calldata ids, uint64[] calldata eventPower) external {
         _checkRole(ROLE_ADD_EVENT);
         for (uint i = 0; i < ids.length; i++) {
-            uint64 eventPower_ = this.EventPower(ids[i]) + eventPower[i];
-            info[ids[i]].EventPower = eventPower_;
+            uint64 eventPoint_ = EventPoint(ids[i]) + eventPower[i];
+            info[ids[i]].EventPoint = eventPoint_;
         }
     }
 
-    function updateAll(uint256[] calldata ids, uint64[] calldata poc, uint64 time, uint64[] calldata vePower, uint64[] calldata eventPower) external {
+    struct updateInfo {
+        uint64 POC_Increase;
+        uint64 VEPower;
+        uint64 EventPoint_Increase;
+    }
+
+    function updateAll(uint256[] calldata ids, updateInfo[] calldata infos, uint256 time) external {
         _checkRole(ROLE_ADD_POC);
         _checkRole(ROLE_SET_VEPOWER);
         _checkRole(ROLE_ADD_EVENT);
         for (uint i = 0; i < ids.length; i++) {
             require(time >= info[ids[i]].Timestamp);
-            uint64 poc_ = this.POC(ids[i], uint256(time)) + poc[i];
-            uint64 eventPower_ = this.EventPower(ids[i]) + eventPower[i];
-            info[ids[i]] = Info(poc_, time, vePower[i], eventPower_);
+            uint64 poc_ = POC(ids[i], uint256(time)) + infos[i].POC_Increase;
+            uint64 eventPower_ = EventPoint(ids[i]) + infos[i].EventPoint_Increase;
+            info[ids[i]] = Info(poc_, time, infos[i].VEPower, eventPower_);
         }
+    }
+
+    function vePower2vePoint(uint256 v) public pure returns (uint256) {
+        return 824 * lg(v / 1 ether +1) ** 2 + 500 * v / 1 ether / 1000;
+    }
+
+    function lg(uint256 x) public pure returns (uint256 y) {
+        y = 0;
+        for (uint i = 0; i < 255; i++) {
+            x = x / 10;
+            if (x == 0) {
+                return y;
+            }
+            y++;
+        }
+        revert("exp max loops exceeded");
     }
 }

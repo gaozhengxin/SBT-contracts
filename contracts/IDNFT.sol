@@ -13,15 +13,28 @@ interface IMultiHonor {
     function Level(uint256 tokenId) view external returns(uint8);
 }
 
+/**
+ * ID card NFT for MultiDAO
+ */
 contract IDNFT_v1 is ERC721EnumerableUpgradeable,OwnableUpgradeable {
     function initialize()public initializer{
         __ERC721_init_unchained("IDNFT", "IDNFT");
         __Ownable_init_unchained();
     }
 
-    uint256 public tokenId;
+    uint256 public nextTokenId;
     address public honor;
+    mapping(uint256 => bool) public allowTransfer;
 
+    function setHonor(address honor_) external onlyOwner {
+        honor = honor_;
+    }
+
+    function allowTransfer(uint256 tokenId) external onlyOwner {
+        allowTransfer[tokenId] = true;
+    }
+
+    // Only tokenIds which are approved by contract owner can be transferred
     function _beforeTokenTransfer(
         address from,
         address to,
@@ -29,20 +42,15 @@ contract IDNFT_v1 is ERC721EnumerableUpgradeable,OwnableUpgradeable {
     ) internal virtual override {
         super._beforeTokenTransfer(from, to, tokenId);
 
-        require(balanceOf(to) == 0);
+        require(allowTransfer[tokenId], "transfer is forbidden");
+        allowTransfer[tokenId] = false;
+        require(balanceOf(to) == 0, "receiver already has an ID card");
     }
 
-    function _transfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) internal virtual {
-        require(false, "transfer is forbidden");
-    }
-
-    function claim() external {
+    function claim() external returns(uint256 tokenId) {
+        tokenId = nextTokenId;
         _mint(msg.sender, tokenId);
-        tokenId++;
+        nextTokenId++;
     }
 
     function burn(uint256 tokenId) external {
@@ -57,7 +65,7 @@ contract IDNFT_v1 is ERC721EnumerableUpgradeable,OwnableUpgradeable {
 
     function _tokenURI(uint _tokenId) internal pure returns (string memory output) {
         uint lvl = IMultiHonor(honor).Level(_tokenId);
-        output = string(abi.encodePacked('https://gateway.pinata.cloud/ipfs/QmTYwELcSgghx32VMsSGgWFQvCAqZ5tg6kKaPh2MSJfwAj/', toString(lvl)));
+        output = string(abi.encodePacked('https://multichaindao.org/idcard/', toString(lvl)));
     }
 
     function toString(uint256 value) internal pure returns (string memory) {
