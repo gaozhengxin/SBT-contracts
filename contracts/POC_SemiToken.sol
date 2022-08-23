@@ -37,6 +37,10 @@ contract POC_SemiToken is IERC20 {
     address public owner;
     address public pendingOwner;
 
+    string public name = "POC_SemiToken";
+    string public symbol = "POCST";
+    uint8 public decimals = 0;
+
     modifier onlyOwner {
         require(msg.sender == owner);
         _;
@@ -57,12 +61,21 @@ contract POC_SemiToken is IERC20 {
     mapping(address => uint256) public cap;
     mapping(address => mapping(address => uint256)) public _allowance;
 
+    constructor (address idcard_, address honor_) {
+        owner = msg.sender;
+        idcard = idcard_;
+        honor = honor_;
+    }
+
     function setIssuer(address issuer, uint256 cap_) external onlyOwner {
         cap[issuer] = cap_;
         emit SetIssuer(issuer, cap_);
     }
 
     function balanceOf(address account) external view returns (uint256) {
+        if (cap[account] > 0) {
+            return cap[account];
+        }
         uint256 tokenId = IERC721Enumerable(idcard).tokenOfOwnerByIndex(account, 0);
         return IMultiHonor(honor).POC(tokenId);
     }
@@ -73,12 +86,12 @@ contract POC_SemiToken is IERC20 {
 
     // issue poc by issuer
     function transfer(address to, uint256 amount) external returns (bool) {
-        require(cap[msg.sender] > amount, "transfer not allowed");
+        require(cap[msg.sender] >= amount, "transfer not allowed");
         cap[msg.sender] -= amount;
         uint256 tokenId = IERC721Enumerable(idcard).tokenOfOwnerByIndex(to, 0);
-        uint256[] memory ids;
-        uint64[] memory pocs;
+        uint256[] memory ids = new uint256[](1);
         ids[0] = tokenId;
+        uint64[] memory pocs = new uint64[](1);
         pocs[0] = uint64(amount);
         IMultiHonor(honor).addPOC(ids, pocs, uint64(block.timestamp));
         _totalSupply += amount;
@@ -88,17 +101,17 @@ contract POC_SemiToken is IERC20 {
 
     // issue poc from issuer
     function transferFrom(
-        address from,
+        address issuer,
         address to,
         uint256 amount
     ) external returns (bool) {
-        require(cap[from] > amount, "transfer not allowed");
-        _allowance[msg.sender][from] -= amount;
-        cap[from] -= amount;
+        require(cap[issuer] >= amount, "transfer not allowed");
+        _allowance[msg.sender][issuer] -= amount;
+        cap[issuer] -= amount;
         uint256 tokenId = IERC721Enumerable(idcard).tokenOfOwnerByIndex(to, 0);
-        uint256[] memory ids;
-        uint64[] memory pocs;
+        uint256[] memory ids = new uint256[](1);
         ids[0] = tokenId;
+        uint64[] memory pocs = new uint64[](1);
         pocs[0] = uint64(amount);
         IMultiHonor(honor).addPOC(ids, pocs, uint64(block.timestamp));
         _totalSupply += amount;
@@ -107,8 +120,8 @@ contract POC_SemiToken is IERC20 {
     }
 
     // issuer's allowance to spender
-    function allowance(address owner, address spender) external view returns (uint256) {
-        return _allowance[owner][spender];
+    function allowance(address issuer, address spender) external view returns (uint256) {
+        return _allowance[issuer][spender];
     }
 
     // issuer approve to spender

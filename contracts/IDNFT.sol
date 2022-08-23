@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 
@@ -18,20 +19,21 @@ interface IMultiHonor {
  */
 contract IDNFT_v1 is ERC721EnumerableUpgradeable,OwnableUpgradeable {
     function initialize()public initializer{
-        __ERC721_init_unchained("IDNFT", "IDNFT");
+        __Context_init_unchained();
         __Ownable_init_unchained();
+        __ERC721_init_unchained("IDNFT", "IDNFT");
     }
 
     uint256 public nextTokenId;
     address public honor;
-    mapping(uint256 => bool) public allowTransfer;
+    mapping(uint256 => bool) public isAllowTransfer;
 
     function setHonor(address honor_) external onlyOwner {
         honor = honor_;
     }
 
     function allowTransfer(uint256 tokenId) external onlyOwner {
-        allowTransfer[tokenId] = true;
+        isAllowTransfer[tokenId] = true;
     }
 
     // Only tokenIds which are approved by contract owner can be transferred
@@ -42,14 +44,16 @@ contract IDNFT_v1 is ERC721EnumerableUpgradeable,OwnableUpgradeable {
     ) internal virtual override {
         super._beforeTokenTransfer(from, to, tokenId);
 
-        require(allowTransfer[tokenId], "transfer is forbidden");
-        allowTransfer[tokenId] = false;
+        require(isAllowTransfer[tokenId], "transfer is forbidden");
+        isAllowTransfer[tokenId] = false;
         require(balanceOf(to) == 0, "receiver already has an ID card");
     }
 
     function claim() external returns(uint256 tokenId) {
         tokenId = nextTokenId;
+        isAllowTransfer[tokenId] = true;
         _mint(msg.sender, tokenId);
+        isAllowTransfer[tokenId] = false;
         nextTokenId++;
     }
 
@@ -63,7 +67,7 @@ contract IDNFT_v1 is ERC721EnumerableUpgradeable,OwnableUpgradeable {
         return _tokenURI(tokenId);
     }
 
-    function _tokenURI(uint _tokenId) internal pure returns (string memory output) {
+    function _tokenURI(uint _tokenId) internal view returns (string memory output) {
         uint lvl = IMultiHonor(honor).Level(_tokenId);
         output = string(abi.encodePacked('https://multichaindao.org/idcard/', toString(lvl)));
     }

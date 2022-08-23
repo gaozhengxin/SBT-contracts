@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 interface IMultiHonor {
     function POC(uint256 tokenId) view external returns(uint64);
@@ -10,14 +11,15 @@ interface IMultiHonor {
     function Level(uint256 tokenId) view external returns(uint8);
 }
 
-contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
+contract MultiHonor_V1 is Initializable, IMultiHonor, AccessControlUpgradeable {
     function initialize() public initializer {
+        __Context_init_unchained();
         __AccessControl_init_unchained();
         __initRole();
+        __initSBT();
 	}
 
     address public IDCard;
-    bytes32 public constant ROLE_ROOT = keccak256("ROLE_ROOT");
     bytes32 public constant ROLE_ADD_POC = keccak256("ROLE_ADD_POC");
     bytes32 public constant ROLE_SET_POC = keccak256("ROLE_SET_POC");
     bytes32 public constant ROLE_SET_VEPOWER = keccak256("ROLE_SET_VEPOWER");
@@ -25,39 +27,27 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
     bytes32 public constant ROLE_SET_EVENT = keccak256("ROLE_SET_EVENT");
 
     function __initRole() internal {
-        _setupRole(ROLE_ROOT, msg.sender);
-        _setupRole(ROLE_ADD_POC, msg.sender);
-        _setupRole(ROLE_SET_POC, msg.sender);
-        _setupRole(ROLE_SET_VEPOWER, msg.sender);
-        _setupRole(ROLE_ADD_EVENT, msg.sender);
-        _setupRole(ROLE_SET_EVENT, msg.sender);
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    function setRoleRoot(address to) external {
-        _checkRole(ROLE_ROOT);
-        _setupRole(ROLE_ROOT, to);
+    uint256 public weight_poc;
+    uint256 public weight_vepoint;
+    uint256 public weight_event;
+
+    uint256 public k;
+    uint256 constant k_denominator = 1000000;
+    // uint256 constant p = 1000000000;
+
+    function __initSBT() internal {
+        weight_poc = 600;
+        weight_vepoint = 300;
+        weight_event = 100;
+        k = 0;
     }
 
-    function setRoleAddPOC(address to) external {
-        _checkRole(ROLE_ROOT);
-        _setupRole(ROLE_ADD_POC, to);
-
-    }
-
-    function setRoleSetPOC(address to) external {
-        _checkRole(ROLE_ROOT);
-        _setupRole(ROLE_SET_POC, to);
-
-    }
-
-    function setRoleSetVEPower(address to) external {
-        _checkRole(ROLE_ROOT);
-        _setupRole(ROLE_SET_VEPOWER, to);
-    }
-
-    function setRoleSetEvent(address to) external {
-        _checkRole(ROLE_ROOT);
-        _setupRole(ROLE_SET_EVENT, to);
+    function setIDCard(address IDCard_) external {
+        _checkRole(DEFAULT_ADMIN_ROLE);
+        IDCard = IDCard_;
     }
 
     struct Info {
@@ -69,10 +59,6 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
 
     mapping(uint256 => Info) private info;
 
-    uint256 public k;
-    uint256 constant k_denominator = 1000000;
-    // uint256 constant p = 1000000000;
-
     // returns user's POC at a specific time after checkpoint
     function POC(uint256 tokenId, uint256 time) view external returns(uint64) {
         return uint64(uint256(info[tokenId].POC) - uint256(time - info[tokenId].Timestamp) * k / k_denominator);
@@ -82,7 +68,7 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
 
     // returns user's current POC
     function POC(uint256 tokenId) override view external returns(uint64) {
-        return POC(tokenId, block.timestamp);
+        return this.POC(tokenId, block.timestamp);
     }
 
     // returns user's current VEPower
@@ -92,7 +78,7 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
 
     // returns user's current VEPoint
     function VEPoint(uint256 tokenId) override view external returns(uint64) {
-        return vePower2vePoint(VEPower(tokenId));
+        return uint64(vePower2vePoint(this.VEPower(tokenId)));
     }
 
     // returns user's current EventPoint
@@ -100,44 +86,47 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
         return info[tokenId].EventPoint;
     }
 
-    uint64 public level_5 = 200000;
-    uint64 public level_4 = 100000;
-    uint64 public level_3 = 30000;
-    uint64 public level_2 = 5000;
-    uint64 public level_1 = 1000;
+    function levelRequire(uint level) pure public returns(uint64) {
+        if (level == 5) {
+            return 200000;
+        }
+        if (level == 4) {
+            return 100000;
+        }
+        if (level == 3) {
+            return 30000;
+        }
+        if (level == 2) {
+            return 5000;
+        }
+        if (level == 1) {
+            return 1000;
+        }
+    }
 
     // returns user's level
     function Level(uint256 tokenId) override view external returns(uint8) {
-        if (TotalPoint(tokenId) > level_5) {
+        if (this.TotalPoint(tokenId) > levelRequire(5)) {
             return 5;
         }
-        if (TotalPoint(tokenId) > level_4) {
+        if (this.TotalPoint(tokenId) > levelRequire(4)) {
             return 4;
         }
-        if (TotalPoint(tokenId) > level_3) {
+        if (this.TotalPoint(tokenId) > levelRequire(3)) {
             return 3;
         }
-        if (TotalPoint(tokenId) > level_2) {
+        if (this.TotalPoint(tokenId) > levelRequire(2)) {
             return 2;
         }
-        if (TotalPoint(tokenId) > level_1) {
+        if (this.TotalPoint(tokenId) > levelRequire(1)) {
             return 1;
         }
         return 0;
     }
 
-    uint256 public weight_poc = 600;
-    uint256 public weight_vepoint = 300;
-    uint256 public weight_event = 100;
-
     // returns user's total honor
     function TotalPoint(uint256 tokenId) override view external returns(uint64) {
-        return uint64((POC(tokenId) * weight_poc + VEPoint(tokenId) * weight_vepoint + EventPoint(tokenId) * tokenId) / (weight_poc + weight_vepoint + weight_event));
-    }
-
-    function setK(uint256 k_) external {
-        _checkRole(ROLE_SET_POC);
-        k = k_;
+        return uint64((this.POC(tokenId) * weight_poc + this.VEPoint(tokenId) * weight_vepoint + this.EventPoint(tokenId) * tokenId) / (weight_poc + weight_vepoint + weight_event));
     }
 
     // @dev cover Poc point
@@ -156,7 +145,7 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
         require(uint256(time) <= block.timestamp);
         for (uint i = 0; i < ids.length; i++) {
             require(time >= info[ids[i]].Timestamp);
-            uint64 poc_ = POC(ids[i], uint256(time)) + poc[i];
+            uint64 poc_ = this.POC(ids[i], uint256(time)) + poc[i];
             info[ids[i]].POC = poc_;
             info[ids[i]].Timestamp = time;
         }
@@ -181,7 +170,7 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
     function addEventPoint(uint256[] calldata ids, uint64[] calldata eventPower) external {
         _checkRole(ROLE_ADD_EVENT);
         for (uint i = 0; i < ids.length; i++) {
-            uint64 eventPoint_ = EventPoint(ids[i]) + eventPower[i];
+            uint64 eventPoint_ = this.EventPoint(ids[i]) + eventPower[i];
             info[ids[i]].EventPoint = eventPoint_;
         }
     }
@@ -198,9 +187,9 @@ contract MultiHonor_V1 is IMultiHonor, AccessControlUpgradeable {
         _checkRole(ROLE_ADD_EVENT);
         for (uint i = 0; i < ids.length; i++) {
             require(time >= info[ids[i]].Timestamp);
-            uint64 poc_ = POC(ids[i], uint256(time)) + infos[i].POC_Increase;
-            uint64 eventPower_ = EventPoint(ids[i]) + infos[i].EventPoint_Increase;
-            info[ids[i]] = Info(poc_, time, infos[i].VEPower, eventPower_);
+            uint64 poc_ = this.POC(ids[i], uint256(time)) + infos[i].POC_Increase;
+            uint64 eventPower_ = this.EventPoint(ids[i]) + infos[i].EventPoint_Increase;
+            info[ids[i]] = Info(poc_, uint64(time), infos[i].VEPower, eventPower_);
         }
     }
 
