@@ -61,6 +61,7 @@ abstract contract AnyCallReceiver is Administrable {
     }
 
     constructor (address anyCallProxy_, uint256 flag_) {
+        setAdmin(msg.sender);
         anyCallProxy = anyCallProxy_;
         flag = flag_;
     }

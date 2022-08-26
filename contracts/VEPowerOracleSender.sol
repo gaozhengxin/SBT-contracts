@@ -106,6 +106,7 @@ contract VEPowerOracleSender is AnyCallSender {
     event GrantVEPowerOracle(uint256 indexed ve_id, uint256[] dao_id, uint256 power, uint256[] weigh);
 
     constructor (address anyCallProxy_, uint256 flag_, address ve_, uint256 daoChainID_) AnyCallSender(anyCallProxy_, flag_) {
+        setAdmin(msg.sender);
         ve = ve_;
         daoChainID = daoChainID_;
     }
