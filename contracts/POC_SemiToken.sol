@@ -18,7 +18,7 @@ interface IERC20 {
 
 interface IMultiHonor {
     function POC(uint256 tokenId) view external returns(uint64);
-    function VEPower(uint256 tokenId) view external returns(uint64);
+    function VEPower(uint256 tokenId) view external returns(uint256);
     function VEPoint(uint256 tokenId) view external returns(uint64);
     function EventPoint(uint256 tokenId) view external returns(uint64);
     function TotalPoint(uint256 tokenId) view external returns(uint64); 
