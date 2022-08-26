@@ -133,19 +133,21 @@ contract VEPowerOracleSender is AnyCallSender {
     }
 
     function calcAvgVEPower(uint256 ve_id) view public returns(uint256 avgPower) {
-        uint256 step = veEpochLength / 4;
+        uint t_0 = currentEpoch() * veEpochLength;
+        uint interval = veEpochLength / 6;
+        uint rand_i;
+        uint p_i;
+        uint t_i;
+        uint sum_p;
 
-        uint256 t_0 = currentEpoch() * veEpochLength;
-        uint256 t_1 = t_0 + step;
-        uint256 t_2 = t_1 + step;
-        uint256 t_3 = t_2 + step;
+        for (uint i = 0; i < 6; i++) {
+            rand_i = uint256(keccak256(abi.encodePacked(i, ve_id, currentEpoch()))) % 1000;
+            t_i = t_0 + i * interval + interval * rand_i / 1000;
+            p_i = getPower(ve_id, t_i);
+            sum_p += p_i;
+        }
 
-        uint p_3 = getPower(ve_id, t_3);
-        uint p_2 = getPower(ve_id, t_2);
-        uint p_1 = getPower(ve_id, t_1);
-        uint p_0 = getPower(ve_id, t_0);
-
-        return (p_0 + p_1 + p_2 + p_3) / 4;
+        return sum_p / 6;
     }
 
     function getPower(uint ve_id, uint t) view public returns (uint256 p) {
