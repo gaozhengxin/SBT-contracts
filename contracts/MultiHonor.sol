@@ -205,18 +205,18 @@ contract MultiHonor_V1 is Initializable, IMultiHonor, AccessControlUpgradeable {
     }
 
     function vePower2vePoint(uint256 v) public pure returns (uint256) {
-        return 824 * lg(v / 1 ether +1) ** 2 + 500 * v / 1 ether / 1000;
+        return 125 * log_2((v / 1 ether +1) ** 2) + 514 * v / 1 ether / 1000;
     }
 
-    function lg(uint256 x) public pure returns (uint256 y) {
+    function log_2(uint256 x) public pure returns (uint256 y) {
         y = 0;
         for (uint i = 0; i < 255; i++) {
-            x = x / 10;
-            if (x == 0) {
-                return y;
-            }
+            x = x >> 1;
+			if (x == 0) {
+				return y;
+			}
             y++;
         }
-        revert("exp max loops exceeded");
+        revert("log_2 max loops exceeded");
     }
 }
