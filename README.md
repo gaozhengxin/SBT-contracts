@@ -1,10 +1,21 @@
 # MultiDAO contracts
-## Polygon Mumbai Testnet
+## Polygon Mainnet
 - 0.8.14
-- Admin - 0xE9058a6685fB99b1dDA6a8aab2865b59f7095C3d
-- Proxy admin - 0xd723a26da0cb4c0044f99da34dd2a5ba0f884eb4
-- ID card logic - 0x5aD702B98194046b0998c552F04Fd74A582560A1
-- ID card proxy - 0x1e1a9090c8f2adf292042a89639d7a54ab523ad7
-- MultiHonor logic - 0x118cf8d6a6366d2b1e769fc3c307c376b1d50d05
-- MultiHonor proxy - 0xfB6F396feC18e054a3E05dbd5129f42A020778a8
-- POC semi-token - 0xe951cd49af4edd03cb972a4b88cd0559e2bc801c
+- Proxy admin - 0xe7E22Ad06493b97dd86875C7F59f0d71C664c75E
+- ID card logic - 0xd8485513dd9947aa3287D90Fd3804D3dF52D0Da1
+- ID card proxy - 0x7a02492bAa66B0b8266a6d25Bbd6D8BA169296CC
+- MultiHonor logic - 0xc28Ea768221f67B6A1fD33e6aa903d4e42f6b177
+- MultiHonor proxy - 0xDd98B79b36c77Ee1F23f37B61e58A61cc3D5aceF
+- POC semi-token - 0x712052F807eafd1A27D7350e33F0A6C500385Df4
+- 1155 querier - 0xb8c042a700d65a0201da43748de3729f0f34eb23
+- Vote power qurey token - 0xa0EDa2D19211D108772711A3698C69f79673aEC8
+- VE oracle receiver - 0x70523d78A74f5533768075283BcB473cA01A8A4b
+
+## Ethereum Mainnet
+- VE oracle sender - 0x5e86F866E8F26660caC82F70D69d70EA68Cd5A5f
+
+## Fantom Mainnet
+- VE oracle sender - 0x6f34bDF41A982BF4EB80D955A6BaC36A981B56C9
+
+## BSC Mainnet
+- VE oracle sender - 0x4eACB8449E1e0aE8A0CF7cCf013A4fac912923F2
