@@ -103,7 +103,7 @@ contract VEPowerOracleSender is AnyCallSender {
     uint256 public veEpochLength = 7257600;
     uint256 public daoChainID;
 
-    event GrantVEPowerOracle(uint256 indexed ve_id, uint256[] dao_id, uint256 power, uint256[] weigh);
+    event GrantVEPowerOracle(uint256 indexed ve_id, uint256 dao_id, uint256 power);
 
     constructor (address anyCallProxy_, uint256 flag_, address ve_, uint256 daoChainID_) AnyCallSender(anyCallProxy_, flag_) {
         setAdmin(msg.sender);
@@ -118,19 +118,18 @@ contract VEPowerOracleSender is AnyCallSender {
     /// @notice delegateVEPower calculates average VE power in current epoch
     /// and send VE info to DAO chain
     /// @param ve_id ve tokenId
-    /// @param dao_ids dao id
-    /// @param weigh weigh
+    /// @param dao_id dao id
     /// Receiver will update DAO user's VE point
     /// Receiver will prevent double granting
-    function delegateVEPower(uint256 ve_id, uint256[] calldata dao_ids, uint256[] calldata weigh) external payable {
+    function delegateVEPower(uint256 ve_id, uint256 dao_id) external payable {
         require(IVE(ve).ownerOf(ve_id) == msg.sender, "only ve owner");
 
         uint256 power = calcAvgVEPower(ve_id);
     
-        bytes memory data = abi.encode(ve_id, dao_ids, power, weigh);
+        bytes memory data = abi.encode(ve_id, dao_id, power);
     
         _anyCall(receiver[daoChainID], data, address(this), daoChainID);
-        emit GrantVEPowerOracle(ve_id, dao_ids, power, weigh);
+        emit GrantVEPowerOracle(ve_id, dao_id, power);
     }
 
     function calcAvgVEPower(uint256 ve_id) view public returns(uint256 avgPower) {

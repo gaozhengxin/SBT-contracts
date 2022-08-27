@@ -93,7 +93,7 @@ interface IMultiHonor {
 contract VEPowerOracleReceiver is AnyCallReceiver {
     address public multiHonor;
     uint256 public veEpochLength = 7257600; // 12 weeks
-    mapping(uint256 => bool) public spent; // ve key => true / false
+    mapping(uint256 => uint256) public delegatedPower; // ve key => power
 
     constructor (address anyCallProxy_, uint256 flag_, address multiHonor_) AnyCallReceiver(anyCallProxy_, flag_) {
         multiHonor = multiHonor_;
@@ -110,32 +110,22 @@ contract VEPowerOracleReceiver is AnyCallReceiver {
 
     /// @notice onReceive decode anyCall msg, update dao user's ve power
     function onReceive(uint256 fromChainID, bytes calldata data) internal override returns (bool success, bytes memory result) {
-        (uint256 ve_id, uint256[] memory dao_ids, uint256 power, uint256[] memory weigh) = abi.decode(
+        (uint256 ve_id, uint256 dao_id, uint256 power) = abi.decode(
             data,
-            (uint256, uint256[], uint256, uint256[])
+            (uint256, uint256, uint256)
         );
 
-        uint256 vekey = veKey(fromChainID, ve_id, currentEpoch());
-        if (spent[vekey]) {
-            return (false, bytes("cannot double delegate"));
-        }
-        spent[vekey] = true;
-    
-        if (dao_ids.length != weigh.length) {
-            return (false, bytes("weigh length error"));
-        }
-    
-        uint256 totalWeigh = 0;
-        for (uint i = 0; i < weigh.length; i++) {
-            totalWeigh += weigh[i];
-        }
+        uint256 _veKey = veKey(fromChainID, ve_id, currentEpoch());
 
-        uint256[] memory vePowers = new uint256[](dao_ids.length);
-        for (uint i = 0; i < dao_ids.length; i++) {
-            uint dPower = power * weigh[i] / totalWeigh;
-            vePowers[i] = IMultiHonor(multiHonor).VEPower(dao_ids[i]) + dPower;
-        }
+        uint256 oldPower = IMultiHonor(multiHonor).VEPower(dao_id);
+        uint256 newPower = oldPower - delegatedPower[_veKey] + power;
+        delegatedPower[_veKey] = power;
+
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = dao_id;
+        uint256[] memory vePowers = new uint256[](1);
+        vePowers[0] = newPower;
     
-        IMultiHonor(multiHonor).setVEPower(dao_ids, vePowers);
+        IMultiHonor(multiHonor).setVEPower(ids, vePowers);
     }
 }
