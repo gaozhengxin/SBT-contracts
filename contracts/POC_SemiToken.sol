@@ -23,7 +23,7 @@ interface IMultiHonor {
     function EventPoint(uint256 tokenId) view external returns(uint64);
     function TotalPoint(uint256 tokenId) view external returns(uint64); 
     function Level(uint256 tokenId) view external returns(uint8);
-    function addPOC(uint256[] calldata ids, uint64[] calldata poc, uint64 time) external;
+    function addPOC(uint256[] calldata ids, uint64[] calldata poc) external;
 }
 
 interface IERC721Enumerable {
@@ -93,7 +93,7 @@ contract POC_SemiToken is IERC20 {
         ids[0] = tokenId;
         uint64[] memory pocs = new uint64[](1);
         pocs[0] = uint64(amount);
-        IMultiHonor(honor).addPOC(ids, pocs, uint64(block.timestamp));
+        IMultiHonor(honor).addPOC(ids, pocs);
         _totalSupply += amount;
         emit Transfer(msg.sender, to, amount);
         return true;
@@ -113,7 +113,7 @@ contract POC_SemiToken is IERC20 {
         ids[0] = tokenId;
         uint64[] memory pocs = new uint64[](1);
         pocs[0] = uint64(amount);
-        IMultiHonor(honor).addPOC(ids, pocs, uint64(block.timestamp));
+        IMultiHonor(honor).addPOC(ids, pocs);
         _totalSupply += amount;
         emit Transfer(msg.sender, to, amount);
         return true;
