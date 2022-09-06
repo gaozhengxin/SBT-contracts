@@ -11,6 +11,10 @@ interface IMultiHonor {
     function Level(uint256 tokenId) view external returns(uint8);
 }
 
+interface IERC721Enumerable {
+    function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256);
+}
+
 contract MultiHonor_V1 is Initializable, IMultiHonor, AccessControlUpgradeable {
     function initialize() public initializer {
         __Context_init_unchained();
@@ -151,7 +155,7 @@ contract MultiHonor_V1 is Initializable, IMultiHonor, AccessControlUpgradeable {
 
     // returns user's total honor
     function TotalPoint(uint256 tokenId) override view external returns(uint64) {
-        return uint64((this.POC(tokenId) * weight_poc + this.VEPoint(tokenId) * weight_vepoint + this.EventPoint(tokenId) * tokenId) / (weight_poc + weight_vepoint + weight_event));
+        return uint64((this.POC(tokenId) * weight_poc + this.VEPoint(tokenId) * weight_vepoint + this.EventPoint(tokenId) * weight_event) / (weight_poc + weight_vepoint + weight_event));
     }
 
     // @dev cover Poc point
@@ -218,5 +222,30 @@ contract MultiHonor_V1 is Initializable, IMultiHonor, AccessControlUpgradeable {
             y++;
         }
         revert("log_2 max loops exceeded");
+    }
+
+    function balanceOf(address account, uint256 id) public view returns (uint256 balance) {
+        require(account != address(0), "ERC1155: address zero is not a valid owner");
+        try IERC721Enumerable(IDCard).tokenOfOwnerByIndex(account, 0) returns (uint256 tokenId) {
+            if (id == 0) {
+                balance = uint256(this.TotalPoint(tokenId));
+            }
+            if (id == 1) {
+                balance = uint256(this.POC(tokenId));
+            }
+            if (id == 2) {
+                balance = uint256(this.VEPoint(tokenId));
+            }
+            if (id == 3) {
+                balance = uint256(this.EventPoint(tokenId));
+            }
+            if (id == 4) {
+                balance = uint256(this.Level(tokenId));
+            }
+        } catch {
+            balance = 0;
+        }
+
+        return balance;
     }
 }
