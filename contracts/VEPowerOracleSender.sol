@@ -126,7 +126,7 @@ contract VEPowerOracleSender is AnyCallSender {
 
         uint256 power = calcAvgVEPower(ve_id);
     
-        bytes memory data = abi.encode(ve_id, dao_id, power);
+        bytes memory data = abi.encode(ve_id, dao_id, power, uint256(block.timestamp));
     
         _anyCall(receiver[daoChainID], data, address(this), daoChainID);
         emit GrantVEPowerOracle(ve_id, dao_id, power);

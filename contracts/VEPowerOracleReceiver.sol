@@ -93,7 +93,21 @@ interface IMultiHonor {
 contract VEPowerOracleReceiver is AnyCallReceiver {
     address public multiHonor;
     uint256 public veEpochLength = 7257600; // 12 weeks
-    mapping(uint256 => uint256) public delegatedPower; // ve key => power
+
+    struct DelegateInfo {
+        bool delegated;
+        uint256 delegateTo;
+        uint256 power;
+    }
+
+    mapping(uint256 => DelegateInfo) public delegatedPower; // ve key => power
+
+    /// @dev the map saves dao ids initiated by this contract
+    // dao id got initiated when any ve holders delegate to it
+    // ve power feed by old oracle will stay in multi honor contract
+    // until dao id got initiated
+    // ve holder will have to delegate again after that
+    mapping(uint256 => bool) public initiated;
 
     constructor (address anyCallProxy_, uint256 flag_, address multiHonor_) AnyCallReceiver(anyCallProxy_, flag_) {
         multiHonor = multiHonor_;
@@ -108,24 +122,80 @@ contract VEPowerOracleReceiver is AnyCallReceiver {
         return (fromChainID << 128) + (ve_id << 64) + epoch;
     }
 
-    /// @notice onReceive decode anyCall msg, update dao user's ve power
-    function onReceive(uint256 fromChainID, bytes calldata data) internal override returns (bool success, bytes memory result) {
-        (uint256 ve_id, uint256 dao_id, uint256 power) = abi.decode(
-            data,
-            (uint256, uint256, uint256)
-        );
-
-        uint256 _veKey = veKey(fromChainID, ve_id, currentEpoch());
-
-        uint256 oldPower = IMultiHonor(multiHonor).VEPower(dao_id);
-        uint256 newPower = oldPower - delegatedPower[_veKey] + power;
-        delegatedPower[_veKey] = power;
-
+    /// @notice initiate dao id, clear old ve power
+    function _initDaoId(uint256 dao_id) internal {
         uint256[] memory ids = new uint256[](1);
         ids[0] = dao_id;
         uint256[] memory vePowers = new uint256[](1);
-        vePowers[0] = newPower;
-    
+        vePowers[0] = 0;
         IMultiHonor(multiHonor).setVEPower(ids, vePowers);
+        initiated[dao_id] = true;
+    }
+
+    /// @notice onReceive decode anyCall msg, update dao user's ve power
+    function onReceive(uint256 fromChainID, bytes calldata data) internal override returns (bool success, bytes memory result) {
+        (uint256 ve_id, uint256 dao_id, uint256 power, uint256 timestamp) = abi.decode(
+            data,
+            (uint256, uint256, uint256, uint256)
+        );
+
+        if (timestamp / veEpochLength != currentEpoch()) {
+            return (false, "VE power is expired");
+        }
+
+        if (!initiated[dao_id]) {
+            _initDaoId(dao_id);
+        }
+
+        uint256 _veKey = veKey(fromChainID, ve_id, currentEpoch());
+
+        bool delegated = delegatedPower[_veKey].delegated;
+        uint256 prevDelegated = delegatedPower[_veKey].delegateTo;
+
+        if (!delegated) {
+            delegatedPower[_veKey].delegated = true;
+            delegatedPower[_veKey].delegateTo = dao_id;
+            delegatedPower[_veKey].power = power;
+
+            uint256 oldPower = IMultiHonor(multiHonor).VEPower(dao_id);
+
+            uint256[] memory ids = new uint256[](1);
+            ids[0] = dao_id;
+            uint256[] memory vePowers = new uint256[](1);
+            vePowers[0] = oldPower + power;
+            IMultiHonor(multiHonor).setVEPower(ids, vePowers);
+            return (true, "success");
+        }
+        
+        if (prevDelegated == dao_id) {
+            uint256 oldPower = IMultiHonor(multiHonor).VEPower(dao_id);
+            uint256 newPower = oldPower - delegatedPower[_veKey].power + power;
+
+            delegatedPower[_veKey].power = power;
+
+            uint256[] memory ids = new uint256[](1);
+            ids[0] = dao_id;
+            uint256[] memory vePowers = new uint256[](1);
+            vePowers[0] = newPower;
+            IMultiHonor(multiHonor).setVEPower(ids, vePowers);
+            return (true, "success");
+        } else {
+            uint256 oldPower_0 = IMultiHonor(multiHonor).VEPower(prevDelegated);
+            uint256 newPower_0 = oldPower_0 - delegatedPower[_veKey].power;
+            uint256 oldPower_1 = IMultiHonor(multiHonor).VEPower(dao_id);
+            uint256 newPower_1 = oldPower_1 + power;
+
+            delegatedPower[_veKey].delegateTo = dao_id;
+            delegatedPower[_veKey].power = power;
+
+            uint256[] memory ids = new uint256[](2);
+            ids[0] = prevDelegated;
+            ids[1] = dao_id;
+            uint256[] memory vePowers = new uint256[](2);
+            vePowers[0] = newPower_0;
+            vePowers[1] = newPower_1;
+            IMultiHonor(multiHonor).setVEPower(ids, vePowers);
+            return (true, "success");
+        }
     }
 }
