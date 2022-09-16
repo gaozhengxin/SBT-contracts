@@ -55,6 +55,9 @@ abstract contract AnyCallSender is Administrable {
 
     mapping(uint256 => address) public receiver;
 
+    event SetReceivers(uint256[] chainIDs, address[] receivers);
+    event SetAnyCallProxy(address proxy);
+
     modifier onlyExecutor() {
         require(msg.sender == IAnycallV6Proxy(anyCallProxy).executor());
         _;
@@ -69,10 +72,12 @@ abstract contract AnyCallSender is Administrable {
         for (uint i = 0; i < chainIDs.length; i++) {
             receiver[chainIDs[i]] = receivers[i];
         }
+        emit SetReceivers(chainIDs, receivers);
     }
 
     function setAnyCallProxy(address proxy) public onlyAdmin {
         anyCallProxy = proxy;
+        emit SetAnyCallProxy(proxy);
     }
 
     function _anyCall(address _to, bytes memory _data, address _fallback, uint256 _toChainID) internal {

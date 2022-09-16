@@ -21,6 +21,7 @@ contract MultiHonor_V1 is Initializable, IMultiHonor, AccessControlUpgradeable {
         __AccessControl_init_unchained();
         __initRole();
         __initSBT();
+        __initVEEpoch();
 	}
 
     address public IDCard;
@@ -49,6 +50,7 @@ contract MultiHonor_V1 is Initializable, IMultiHonor, AccessControlUpgradeable {
     event SetVEPower(uint256[] ids, uint256[] vePower, uint64 epoch);
     event SetEventPoint(uint256[] ids, uint64[] eventPower);
     event AddEventPoint(uint256[] ids, uint64[] eventPower);
+    event SetIDCard(address idcard);
 
     function __initSBT() internal {
         weight_poc = 600;
@@ -57,13 +59,14 @@ contract MultiHonor_V1 is Initializable, IMultiHonor, AccessControlUpgradeable {
         k = 0;
     }
 
-    function __initVEEpoch() public {
+    function __initVEEpoch() internal {
         veEpochLength = 7257600; // 12 weeks
     }
 
     function setIDCard(address IDCard_) external {
         _checkRole(DEFAULT_ADMIN_ROLE);
         IDCard = IDCard_;
+        emit SetIDCard(IDCard);
     }
 
     struct POCInfo {

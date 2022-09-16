@@ -28,12 +28,23 @@ contract IDNFT_v1 is ERC721EnumerableUpgradeable,OwnableUpgradeable {
     address public honor;
     mapping(uint256 => bool) public isAllowTransfer;
 
+    event SetHonor(address honor);
+    event AllowTransfer(uint256 tokenId);
+    event ForbidTransfer(uint256 tokenId);
+
     function setHonor(address honor_) external onlyOwner {
         honor = honor_;
+        emit SetHonor(honor);
     }
 
     function allowTransfer(uint256 tokenId) external onlyOwner {
         isAllowTransfer[tokenId] = true;
+        emit AllowTransfer(tokenId);
+    }
+
+    function forbidTransfer(uint256 tokenId) external onlyOwner {
+        isAllowTransfer[tokenId] = false;
+        emit ForbidTransfer(tokenId);
     }
 
     // Only tokenIds which are approved by contract owner can be transferred
