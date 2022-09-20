@@ -214,7 +214,7 @@ contract MultiHonor_V1 is Initializable, IMultiHonor, AccessControlUpgradeable {
     }
 
     function vePower2vePoint(uint256 v) public pure returns (uint256) {
-        return 125 * log_2((v / 1 ether +1) ** 2) + 514 * v / 1 ether / 1000;
+        return 250 * log_2(v / 1 ether +1) + 514 * v / 1 ether / 1000;
     }
 
     function log_2(uint256 x) public pure returns (uint256 y) {
