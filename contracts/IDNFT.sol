@@ -7,31 +7,22 @@ import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 interface IMultiHonor {
-    function POC(uint256 tokenId) external view returns (uint64);
-
-    function VEPower(uint256 tokenId) external view returns (uint64);
-
-    function EventPower(uint256 tokenId) external view returns (uint64);
-
-    function Total(uint256 tokenId) external view returns (uint64);
-
     function Level(uint256 tokenId) external view returns (uint8);
 }
 
-/** @dev Interface for DAO subsystems that depend on idcard, eg MultiHonor
+/**
+ * @dev Interface for DAO subsystems that depend on idcard, eg MultiHonor
  */
 interface ILedger {
     /// @dev A hook function that executes when IDCards got merged.
-    function merge(address fromToken, address toToken) external virtual;
-    function lock(uint256 tokenId) external virtual returns (bytes memory info);
-    function unlock(uint256 tokenId, bytes memory info) external virtual;
+    function merge(uint256 fromToken, uint256 toToken) external virtual;
 }
 
-interface IMessage {
-    function send(
-        uint256 toChainID,
-        bytes memory message
-    ) external virtual;
+/**
+ * @dev Interface of crosschain message channel.
+ */
+interface IMessageChannel {
+    function send(uint256 toChainID, bytes memory message) external virtual;
 }
 
 /**
@@ -41,6 +32,7 @@ interface IMessage {
 interface IDIDAdaptor {
     function connect(
         uint256 tokenId,
+        address claimer,
         bytes32 accountType,
         bytes memory sign_info
     ) external returns (bool);
@@ -54,12 +46,80 @@ interface IDIDAdaptor {
 }
 
 /**
- * ID card NFT for MultiDAO
+ * ID card NFT is a collection of crosschain composable DID NFT.
+ * ID card is connecting to different underlying DID systems on different chains with adaptors.
  */
-contract IDCard_Doublechain is
-    ERC721EnumerableUpgradeable,
-    AccessControlUpgradeable
-{
+contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
+    bytes32 public constant ROLE_ADMIN = keccak256("ROLE_ADMIN");
+    bytes32 public constant ROLE_MESSAGE = keccak256("ROLE_MESSAGE");
+
+    bool v2Initialized;
+
+    uint256 maxTokenIdId;
+    uint256 public nextTokenId;
+
+    string _baseURI_;
+    address public honor;
+
+    bool public transferable;
+    mapping(uint256 => bool) public isAllowTransfer;
+
+    /// @dev Message channel adaptor address.
+    address public messageChannel;
+    /// @dev Peer chains.
+    uint256[] public chains;
+    mapping(address => mapping(bytes4 => bool)) public callerPermission; // caller -> function -> allowed
+    bytes4 FuncMerge = bytes4(keccak256("merge"));
+    bytes4 FuncSignin = bytes4(keccak256("signin"));
+
+    /// @dev Type of DID that IDCard is connected to.
+    mapping(uint256 => bytes32) public accountTypeOf;
+    /// @dev Default account type.
+    bytes32 constant AccountType_Default = bytes32("Default");
+    /// @dev DID adaptor contracts for different DID types.
+    mapping(bytes32 => address) public dIDAdaptor;
+
+    /// @dev A list of MultiDAO subsystem contracts.
+    address[] public ledgers;
+
+    /// @dev Allow claim IDCard without connecting to any DID.
+    bool allowBlankSignup = false;
+
+    event InitV2();
+
+    event SetBaseURI(string baseURI);
+
+    event SetHonor(address honor);
+
+    event SetTransferable(bool transferable);
+    event AllowTransfer(uint256 tokenId);
+    event ForbidTransfer(uint256 tokenId);
+
+    event SetMessageChannel(address messageChannel);
+    event SetChains(uint256[] chains);
+    event SetCallerPermission(address caller, bytes4 func, bool allow);
+
+    event SetDIDAdaptor(string key, bytes32 hashkey, address adaptor);
+
+    event RegisterLedger(address ledger);
+    event RemoveLedger(address ledger);
+
+    event Claim(uint256 tokenId, address owner);
+    event Connect(uint256 tokenId, bytes32 accountType, bytes signinfo);
+    event Disconnect(uint256 tokenId, bytes32 accountType);
+
+    event Signin(uint256 tokenId, uint256[] toChainIDs, address receiverWallet);
+    event Signin(uint256 tokenId, address receiverWallet);
+
+    event MergeLocal(uint256 fromToken, uint256 toToken);
+    event Merge(uint256 fromToken, uint256 toToken);
+    event MergeError(address ledger, uint256 fromToken, uint256 toToken);
+
+    modifier mustInitialized() {
+        require(v2Initialized);
+        _;
+    }
+
     function initialize() public initializer {
         __Context_init_unchained();
         __AccessControl_init_unchained();
@@ -67,48 +127,132 @@ contract IDCard_Doublechain is
         __ERC721_init_unchained("IDNFT", "IDNFT");
     }
 
-    uint256 constant MaxSupply = 1000000000;
-
-    bytes32 public constant ROLE_ADMIN = keccak256("ROLE_ADMIN");
-    bytes32 public constant ROLE_MESSAGE = keccak256("ROLE_MESSAGE");
-    bytes32 public constant ROLE_GATEWAY = keccak256("ROLE_GATEWAY");
-
-    uint256 public nextTokenId;
-    address public honor;
-    mapping(uint256 => bool) public isAllowTransfer;
-
-    /// @dev A list of MultiDAO subsystem contracts.
-    address[] public ledgers;
-
-    address public messageChannel;
-
-    event SetHonor(address honor);
-    event AllowTransfer(uint256 tokenId);
-    event ForbidTransfer(uint256 tokenId);
-
     function __initRole() internal {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
+    /// @dev Initializes V2 settings.
+    function initV2(address messageChannel_, bool transferable_) public {
+        _checkRole(ROLE_ADMIN);
+        require(!v2Initialized);
+        maxTokenIdId = 1000000000;
+        _setBaseURI("ipfs://QmTYwELcSgghx32VMsSGgWFQvCAqZ5tg6kKaPh2MSJfwAj/");
+        _setMessageChannel(messageChannel_);
+        _setTransferable(transferable_);
+        v2Initialized = true;
+        emit InitV2();
+    }
+
+    /// @dev Sets base URI.
+    function setBaseURI(string memory baseURI) public {
+        _checkRole(ROLE_ADMIN);
+        _setBaseURI(baseURI);
+    }
+
+    function _setBaseURI(string memory baseURI) internal {
+        _baseURI_ = baseURI;
+        emit SetBaseURI(_baseURI_);
+    }
+
+    /// @dev Sets MultiHonor address.
     function setHonor(address honor_) external {
         _checkRole(ROLE_ADMIN);
         honor = honor_;
         emit SetHonor(honor);
     }
 
+    /// @dev Sets IDCard NFT as transferable or non-transferable.
+    function setTransferable(bool transferable_) external {
+        _checkRole(ROLE_ADMIN);
+        _setTransferable(transferable_);
+    }
+
+    function _setTransferable(bool transferable_) internal {
+        transferable = transferable_;
+        emit SetTransferable(transferable);
+    }
+
+    /// @dev Sets tokenId as transferable.
     function allowTransfer(uint256 tokenId) external {
         _checkRole(ROLE_ADMIN);
         isAllowTransfer[tokenId] = true;
         emit AllowTransfer(tokenId);
     }
 
+    /// @dev Sets tokenId as non-transferable.
     function forbidTransfer(uint256 tokenId) external {
         _checkRole(ROLE_ADMIN);
         isAllowTransfer[tokenId] = false;
         emit ForbidTransfer(tokenId);
     }
 
-    // Only tokenIds which are approved by contract owner can be transferred
+    /// @dev Sets message channel (adaptor) address.
+    function setMessageChannel(address messageChannel_) external {
+        _checkRole(ROLE_ADMIN);
+        _setMessageChannel(messageChannel_);
+    }
+
+    function _setMessageChannel(address messageChannel_) internal {
+        messageChannel = messageChannel_;
+        emit SetMessageChannel(messageChannel);
+    }
+
+    /// @dev Sets peer chains.
+    function setChains(uint256[] memory chains_) external {
+        _checkRole(ROLE_ADMIN);
+        chains = chains_;
+        emit SetChains(chains);
+    }
+
+    /// @dev Sets remote caller's permission.
+    function setCallerPermission(
+        address caller,
+        bytes4 func,
+        bool allow
+    ) external {
+        _checkRole(ROLE_ADMIN);
+        callerPermission[caller][func] = allow;
+        emit SetCallerPermission(caller, func, allow);
+    }
+
+    /// @dev Sets DID adaptor address.
+    function setDIDAdaptor(string memory key, address adaptor) public {
+        _checkRole(ROLE_ADMIN);
+        dIDAdaptor[keccak256(bytes(key))] = adaptor;
+        emit SetDIDAdaptor(key, keccak256(bytes(key)), adaptor);
+    }
+
+    /// @dev Register ledger.
+    function registerLedgers(address ledger) external {
+        _checkRole(ROLE_ADMIN);
+        for (uint256 i = 0; i < ledgers.length; i++) {
+            if (ledgers[i] == ledger) {
+                revert("already exists");
+            }
+        }
+        ledgers.push(ledger);
+        emit RegisterLedger(ledger);
+    }
+
+    /// @dev Remove ledger.
+    function removeLedger(address ledger) external {
+        _checkRole(ROLE_ADMIN);
+        uint256 index = 0;
+        for (uint256 i = 0; i < ledgers.length; i++) {
+            if (ledgers[i] == ledger) {
+                index = i + 1;
+                break;
+            }
+        }
+        index--;
+        for (uint256 i = index; i < ledgers.length - 1; i++) {
+            ledgers[i] = ledgers[i + i];
+        }
+        ledgers.pop();
+        emit RemoveLedger(ledger);
+    }
+
+    /// @dev Check if token is transferable before transfer.
     function _beforeTokenTransfer(
         address from,
         address to,
@@ -116,28 +260,70 @@ contract IDCard_Doublechain is
     ) internal virtual override {
         super._beforeTokenTransfer(from, to, tokenId);
 
-        require(!isLocked[tokenId], "token id is locked");
-        require(isAllowTransfer[tokenId], "transfer is forbidden");
+        require(
+            transferable || isAllowTransfer[tokenId],
+            "transfer is forbidden"
+        );
         isAllowTransfer[tokenId] = false;
         require(balanceOf(to) == 0, "receiver already has an ID card");
     }
 
-    bytes32 constant AccountType_Default = bytes32("Default");
+    /// @dev Dispatches message to different functions.
+    function onReceiveMessage(address caller, bytes memory message)
+        external
+        mustInitialized
+    {
+        _checkRole(ROLE_MESSAGE);
+        (bytes4 func, bytes memory args) = abi.decode(message, (bytes4, bytes));
+        if (func == FuncMerge) {
+            require(callerPermission[caller][FuncMerge]);
+            onMergeMessage(args);
+            return;
+        }
+        if (func == FuncSignin) {
+            require(callerPermission[caller][FuncSignin]);
+            onSigninMessage(args);
+            return;
+        }
+    }
 
-    mapping(uint256 => bytes32) public accountTypeOf;
-    mapping(bytes32 => address) public dIDAdaptor;
+    /// @dev Returns birth chain of the IDCard.
+    function getChainID(uint256 tokenId)
+        public
+        view
+        mustInitialized
+        returns (uint256 chainID)
+    {
+        chainID = tokenId / maxTokenIdId;
+        if (chainID == 0) {
+            chainID = 137;
+        }
+        return chainID;
+    }
 
-    bool allowBlankSignup = false;
-
-    function setDIDAdaptor(string calldata key, address adaptor) public {
-        _checkRole(ROLE_ADMIN);
-        dIDAdaptor[keccak256(key)] = adaptor;
-        // TODO log
+    /**
+     * @dev Mints NFT to msg sender.
+     * @param accountType DID protocol type, eg whitelist, ENS holder checker, Binance SBT holder checker.
+     * @param sign_info DID account verification info.
+     */
+    function claim(bytes32 accountType, bytes memory sign_info)
+        external
+        mustInitialized
+        returns (uint256 tokenId)
+    {
+        tokenId = nextTokenId;
+        tokenId = tokenId + block.chainid * maxTokenIdId;
+        require(_connect(tokenId, accountType, sign_info));
+        isAllowTransfer[tokenId] = true;
+        _mint(msg.sender, tokenId);
+        isAllowTransfer[tokenId] = false;
+        nextTokenId++;
+        emit Claim(tokenId, msg.sender);
     }
 
     /**
      * @dev Connect a DID account.
-     * @param accountType DID protocol type, eg whitelist, ENS holder checker, Binance SBT holder checker.
+     * @param accountType DID protocol type, eg MultiDAO whitelisted address, ENS holder, Binance BABT holder.
      * @param sign_info DID account verification info.
      */
     function _connect(
@@ -152,20 +338,23 @@ contract IDCard_Doublechain is
         }
         res = IDIDAdaptor(dIDAdaptor[accountType]).connect(
             tokenId,
+            msg.sender,
             accountType,
             sign_info
         );
         if (res) {
             accountTypeOf[tokenId] = accountType;
         }
-        // TODO log
+        emit Connect(tokenId, accountType, sign_info);
         return res;
     }
 
+    /// @dev Verifies if the IDCard holder is the owner of DID that is currently connecting to the IDCard.
     function verifyAccount(uint256 tokenId) public view virtual returns (bool) {
+        require(getChainID(tokenId) == block.chainid);
         bytes32 accountType = accountTypeOf[tokenId];
         if (accountType == AccountType_Default) {
-            return true;
+            return allowBlankSignup;
         }
         return
             IDIDAdaptor(dIDAdaptor[accountType]).verifyAccount(
@@ -174,19 +363,21 @@ contract IDCard_Doublechain is
             );
     }
 
+    /// @dev Update idcard's DID.
     function updateAccountInfo(
         uint256 tokenId,
         bytes32 newAccountType,
         bytes memory new_sign_info
     ) public {
-        require(msg.sender == _ownerOf(fromToken), "check token owner fail");
+        require(msg.sender == _ownerOf(tokenId), "check token owner fail");
         disconnect(tokenId);
         _connect(tokenId, newAccountType, new_sign_info);
     }
 
+    /// @dev Disconnect idcard with DID.
     function disconnect(uint256 tokenId) public returns (bool res) {
         require(
-            msg.sender == _ownerOf(fromToken) || verifyAccount(tokenId),
+            msg.sender == _ownerOf(tokenId) || verifyAccount(tokenId),
             "neither token owner nor DID owner"
         );
         res = IDIDAdaptor(dIDAdaptor[accountTypeOf[tokenId]]).disconnect(
@@ -195,36 +386,82 @@ contract IDCard_Doublechain is
         if (res) {
             accountTypeOf[tokenId] = bytes32(0);
         }
-        // TODO log
+        emit Disconnect(tokenId, accountTypeOf[tokenId]);
     }
 
     /**
-     * @dev Mints NFT to msg sender.
-     * @param accountType DID protocol type, eg whitelist, ENS holder checker, Binance SBT holder checker.
-     * @param sign_info DID account verification info.
+     * @dev Merges 2 idcards on all chains.
+     * Merges tokens locally and send merge message to remote chains.
      */
-    function claim(bytes32 accountType, bytes memory sign_info)
+    function merge(uint256 fromToken, uint256 toToken)
         external
-        returns (uint256 tokenId)
+        mustInitialized
     {
-        tokenId = nextTokenId;
-        tokenId = tokenId + block.chainid * MaxSupply;
-        require(_connect(tokenId, accountType, sign_info));
-        isAllowTransfer[tokenId] = true;
-        _mint(msg.sender, tokenId);
-        isAllowTransfer[tokenId] = false;
-        nextTokenId++;
-        // TODO log
+        require(msg.sender == _ownerOf(fromToken), "check token owner fail");
+        require(_exists(toToken));
+        _merge(fromToken, toToken);
+        bytes memory args = abi.encode(fromToken, toToken);
+        bytes memory message = abi.encode(FuncMerge, args);
+        for (uint256 i = 0; i < chains.length; i++) {
+            IMessageChannel(messageChannel).send(chains[i], message);
+        }
+        emit MergeLocal(fromToken, toToken);
     }
 
-    string _baseURI = "https://multichaindao.org/idcard/";
-
-    function setBaseURI(string baseURI) public {
-        _checkRole(ROLE_ADMIN);
-        _baseURI = baseURI;
-        // TODO log
+    function onMergeMessage(bytes memory message) internal {
+        (uint256 fromToken, uint256 toToken) = abi.decode(
+            message,
+            (uint256, uint256)
+        );
+        _merge(fromToken, toToken);
     }
 
+    /**
+     * @dev Merges 2 idcards locally.
+     */
+    function _merge(uint256 fromToken, uint256 toToken) internal {
+        if (!_exists(fromToken) || !_exists(toToken)) {
+            return;
+        }
+        _burn(fromToken);
+        emit Merge(fromToken, toToken);
+    }
+
+    /// @dev Calls registered ledgers to merge tokens.
+    function mergeLedgers(uint256 fromToken, uint256 toToken) internal {
+        require(fromToken != toToken);
+        require(_exists(toToken));
+        for (uint256 i = 0; i < ledgers.length; i++) {
+            try ILedger(ledgers[i]).merge(fromToken, toToken) {} catch {
+                emit MergeError(ledgers[i], fromToken, toToken);
+            }
+        }
+    }
+
+    /// @dev Sign IDCard to remote chains.
+    function signin(
+        uint256 tokenId,
+        uint256[] calldata toChainIDs,
+        address receiverWallet
+    ) external mustInitialized {
+        bytes memory args = abi.encode(tokenId, receiverWallet);
+        bytes memory message = abi.encode(FuncSignin, args);
+        for (uint256 i = 0; i < toChainIDs.length; i++) {
+            IMessageChannel(messageChannel).send(chains[i], message);
+        }
+        emit Signin(tokenId, toChainIDs, receiverWallet);
+    }
+
+    function onSigninMessage(bytes memory message) internal {
+        (uint256 tokenId, address receiverWallet) = abi.decode(
+            message,
+            (uint256, address)
+        );
+        _mint(receiverWallet, tokenId);
+        emit Signin(tokenId, receiverWallet);
+    }
+
+    /// @dev Returns token URI.
     function tokenURI(uint256 tokenId)
         public
         view
@@ -242,7 +479,7 @@ contract IDCard_Doublechain is
         returns (string memory output)
     {
         uint256 lvl = IMultiHonor(honor).Level(_tokenId);
-        output = string(abi.encodePacked(_baseURI, toString(lvl)));
+        output = string(abi.encodePacked(_baseURI_, toString(lvl)));
     }
 
     function toString(uint256 value) internal pure returns (string memory) {
@@ -267,103 +504,12 @@ contract IDCard_Doublechain is
         return string(buffer);
     }
 
-    function getChainID(uint256 tokenId) pure returns (uint256 chainID) {
-        chainID = tokenId / MaxSupply;
-        if (chainID == 0) {
-            chainID = 137;
-        }
-        return chainID;
-    }
-
-    /**
-     * @dev Merges 2 idcards.
-     * @param fromToken is burned.
-     * @param toToken's owner remains unchanged.
-     */
-    function merge(uint256 fromToken, uint256 toToken) external {
-        require(msg.sender == _ownerOf(fromToken), "check token owner fail"); // asserting fromToken exists on this chain
-        require(!isLocked[fromToken]);
-        require(verifyAccount(fromToken), "verify DID fail");
-        bytes memory args = abi.encode(fromToken, toToken);
-        bytes memory message = abi.encode(bytes4(keccak256("merge")), args);
-        if (getChainID(toToken) == block.chainid) {
-            _merge(fromToken, toToken);
-        } else {
-            IMessage(messageChannel).send(getChainID(toToken), message);
-        }
-        // TODO log
-    }
-
-    function onReceiveMessage(bytes memory message) external {
-        _checkRole(ROLE_MESSAGE);
-        (bytes4 func, bytes args) = abi.decode(message);
-        if (func == bytes4(keccak256("merge"))) {
-            (uint256 fromToken, uint256 toToken) = abi.decode(args);
-            if (getChainID(toToken) == block.chainid) {
-                _merge(fromToken, toToken);
-            }
-        }
-    }
-
-    function _merge(uint256 fromToken, uint256 toToken) internal {
-        mergeLedgers(fromToken, toToken);
-        _burn(fromToken);
-    }
-
-    /**
-     * @dev merge one token to another
-     */
-    function mergeLedgers(uint256 fromToken, uint256 toToken) internal {
-        require(fromToken != toToken);
-        require(_exists(toToken) && !isLocked(toToken));
-        for (uint256 i = 0; i < ledgers.length; i++) {
-            ILedger(ledgers[i]).merge(fromToken, toToken);
-        }
-    }
-
-    function lockLedgers(uint256 tokenId) internal returns (bytes[] memory) {
-        // TODO
-    }
-
-    /**
-     * Token Gateway functions.
-     */
-    mapping(uint256 => bool) public isLocked;
-
-    function lock(uint256 tokenId) internal returns (bytes[] memory info) {
-        // TODO
-        isLocked[tokenId] = true;
-    }
-
-    function unlock(uint256 tokenId, bytes[] memory info) internal {
-        // TODO
-        isLocked[tokenId] = false;
-    }
-
-    /**
-     * @dev Runs when bridging out.
-     * Locks token id, so that it is not transferable,
-     * but does not change the ownership or burn the token id.
-     */
-    function outbound(uint256 tokenId, address receiver) external returns (bytes memory info) {
-        _checkRole(ROLE_GATEWAY);
-        isLocked[tokenId] = true;
-        // TODO log
-    }
-
-    /**
-     * @dev Runs when bridging in.
-     * Unlock token id if it exists. Mint token id if not exists.
-     */
-    function inbound(uint256 tokenId, address receiver, bytes memory info) external {
-        _checkRole(ROLE_GATEWAY);
-        if (!_exists(tokenId)) {
-            isAllowTransfer[tokenId] = true;
-            _mint(owner, tokenId);
-            isAllowTransfer[tokenId] = false;
-        }
-        require(_ownerOf(tokenId) == receiver);
-        isLocked[tokenId] = false;
-        // TODO log
+    function supportsInterface(bytes4 interfaceID)
+        public
+        view
+        override(AccessControlUpgradeable, ERC721EnumerableUpgradeable)
+        returns (bool)
+    {
+        return false;
     }
 }
