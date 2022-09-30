@@ -1,14 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-
-interface IMultiHonor {
-    function Level(uint256 tokenId) external view returns (uint8);
-}
 
 /**
  * @dev Interface for DAO subsystems that depend on idcard, eg MultiHonor
@@ -45,11 +39,28 @@ interface IDIDAdaptor {
     function disconnect(uint256 tokenId) external virtual returns (bool);
 }
 
+interface INFT {
+    function mint(address owner, uint256 tokenId) external;
+
+    function burn(uint256 tokenId) external;
+
+    function exists(uint256 tokenId) external view returns (bool);
+
+    function ownerOf(uint256 tokenId) external view returns (address);
+
+    function allowTransfer(uint256 tokenId) external;
+
+    function forbidTransfer(uint256 tokenId) external;
+}
+
 /**
- * ID card NFT is a collection of crosschain composable DID NFT.
- * ID card is connecting to different underlying DID systems on different chains with adaptors.
+ * @notice ID card manager allow DAO users to
+ * claim ID card,
+ * connect and disconnect idcard with 3rd party DID account,
+ * login to remote chains,
+ * merge idcards.
  */
-contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
+contract IDCard_V2_Manager is AccessControlUpgradeable {
     bytes32 public constant ROLE_ADMIN = keccak256("ROLE_ADMIN");
     bytes32 public constant ROLE_MESSAGE = keccak256("ROLE_MESSAGE");
 
@@ -58,11 +69,7 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     uint256 maxTokenIdId;
     uint256 public nextTokenId;
 
-    string _baseURI_;
-    address public honor;
-
-    bool public transferable;
-    mapping(uint256 => bool) public isAllowTransfer;
+    address public idnft;
 
     /// @dev Message channel adaptor address.
     address public messageChannel;
@@ -70,7 +77,7 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     uint256[] public chains;
     mapping(address => mapping(bytes4 => bool)) public callerPermission; // caller -> function -> allowed
     bytes4 FuncMerge = bytes4(keccak256("merge"));
-    bytes4 FuncSignin = bytes4(keccak256("signin"));
+    bytes4 FuncLogin = bytes4(keccak256("login"));
 
     /// @dev Type of DID that IDCard is connected to.
     mapping(uint256 => bytes32) public accountTypeOf;
@@ -85,15 +92,9 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     /// @dev Allow claim IDCard without connecting to any DID.
     bool allowBlankSignup = false;
 
-    event InitV2();
+    event InitV2Manager();
 
-    event SetBaseURI(string baseURI);
-
-    event SetHonor(address honor);
-
-    event SetTransferable(bool transferable);
-    event AllowTransfer(uint256 tokenId);
-    event ForbidTransfer(uint256 tokenId);
+    event SetNFT(address idnft);
 
     event SetMessageChannel(address messageChannel);
     event SetChains(uint256[] chains);
@@ -108,8 +109,8 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     event Connect(uint256 tokenId, bytes32 accountType, bytes signinfo);
     event Disconnect(uint256 tokenId, bytes32 accountType);
 
-    event Signin(uint256 tokenId, uint256[] toChainIDs, address receiverWallet);
-    event Signin(uint256 tokenId, address receiverWallet);
+    event Login(uint256 tokenId, uint256[] toChainIDs, address receiverWallet);
+    event Login(uint256 tokenId, address receiverWallet);
 
     event MergeLocal(uint256 fromToken, uint256 toToken);
     event Merge(uint256 fromToken, uint256 toToken);
@@ -124,7 +125,6 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
         __Context_init_unchained();
         __AccessControl_init_unchained();
         __initRole();
-        __ERC721_init_unchained("IDNFT", "IDNFT");
     }
 
     function __initRole() internal {
@@ -132,58 +132,25 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     }
 
     /// @dev Initializes V2 settings.
-    function initV2(address messageChannel_, bool transferable_) public {
+    function initV2Manager(address idnft, address messageChannel_) public {
         _checkRole(ROLE_ADMIN);
         require(!v2Initialized);
         maxTokenIdId = 1000000000;
-        _setBaseURI("ipfs://QmTYwELcSgghx32VMsSGgWFQvCAqZ5tg6kKaPh2MSJfwAj/");
+        _setNFT(idnft);
         _setMessageChannel(messageChannel_);
-        _setTransferable(transferable_);
         v2Initialized = true;
-        emit InitV2();
+        emit InitV2Manager();
     }
 
-    /// @dev Sets base URI.
-    function setBaseURI(string memory baseURI) public {
+    /// @dev Sets IDNFT.
+    function setNFT(address idnft) external {
         _checkRole(ROLE_ADMIN);
-        _setBaseURI(baseURI);
+        _setNFT(idnft);
     }
 
-    function _setBaseURI(string memory baseURI) internal {
-        _baseURI_ = baseURI;
-        emit SetBaseURI(_baseURI_);
-    }
-
-    /// @dev Sets MultiHonor address.
-    function setHonor(address honor_) external {
-        _checkRole(ROLE_ADMIN);
-        honor = honor_;
-        emit SetHonor(honor);
-    }
-
-    /// @dev Sets IDCard NFT as transferable or non-transferable.
-    function setTransferable(bool transferable_) external {
-        _checkRole(ROLE_ADMIN);
-        _setTransferable(transferable_);
-    }
-
-    function _setTransferable(bool transferable_) internal {
-        transferable = transferable_;
-        emit SetTransferable(transferable);
-    }
-
-    /// @dev Sets tokenId as transferable.
-    function allowTransfer(uint256 tokenId) external {
-        _checkRole(ROLE_ADMIN);
-        isAllowTransfer[tokenId] = true;
-        emit AllowTransfer(tokenId);
-    }
-
-    /// @dev Sets tokenId as non-transferable.
-    function forbidTransfer(uint256 tokenId) external {
-        _checkRole(ROLE_ADMIN);
-        isAllowTransfer[tokenId] = false;
-        emit ForbidTransfer(tokenId);
+    function _setNFT(address idnft_) internal {
+        idnft = idnft_;
+        emit SetNFT(idnft_);
     }
 
     /// @dev Sets message channel (adaptor) address.
@@ -252,22 +219,6 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
         emit RemoveLedger(ledger);
     }
 
-    /// @dev Check if token is transferable before transfer.
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) internal virtual override {
-        super._beforeTokenTransfer(from, to, tokenId);
-
-        require(
-            transferable || isAllowTransfer[tokenId],
-            "transfer is forbidden"
-        );
-        isAllowTransfer[tokenId] = false;
-        require(balanceOf(to) == 0, "receiver already has an ID card");
-    }
-
     /// @dev Dispatches message to different functions.
     function onReceiveMessage(address caller, bytes memory message)
         external
@@ -280,20 +231,15 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
             onMergeMessage(args);
             return;
         }
-        if (func == FuncSignin) {
-            require(callerPermission[caller][FuncSignin]);
-            onSigninMessage(args);
+        if (func == FuncLogin) {
+            require(callerPermission[caller][FuncLogin]);
+            onLoginMessage(args);
             return;
         }
     }
 
     /// @dev Returns birth chain of the IDCard.
-    function getChainID(uint256 tokenId)
-        public
-        view
-        mustInitialized
-        returns (uint256 chainID)
-    {
+    function getChainID(uint256 tokenId) public view returns (uint256 chainID) {
         chainID = tokenId / maxTokenIdId;
         if (chainID == 0) {
             chainID = 137;
@@ -314,9 +260,9 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
         tokenId = nextTokenId;
         tokenId = tokenId + block.chainid * maxTokenIdId;
         require(_connect(tokenId, accountType, sign_info));
-        isAllowTransfer[tokenId] = true;
-        _mint(msg.sender, tokenId);
-        isAllowTransfer[tokenId] = false;
+        INFT(idnft).allowTransfer(tokenId);
+        INFT(idnft).mint(msg.sender, tokenId);
+        INFT(idnft).forbidTransfer(tokenId);
         nextTokenId++;
         emit Claim(tokenId, msg.sender);
     }
@@ -369,7 +315,10 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
         bytes32 newAccountType,
         bytes memory new_sign_info
     ) public {
-        require(msg.sender == _ownerOf(tokenId), "check token owner fail");
+        require(
+            msg.sender == INFT(idnft).ownerOf(tokenId),
+            "check token owner fail"
+        );
         disconnect(tokenId);
         _connect(tokenId, newAccountType, new_sign_info);
     }
@@ -377,8 +326,7 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     /// @dev Disconnect idcard with DID.
     function disconnect(uint256 tokenId) public returns (bool res) {
         require(
-            msg.sender == _ownerOf(tokenId) || verifyAccount(tokenId),
-            "neither token owner nor DID owner"
+            msg.sender == INFT(idnft).ownerOf(tokenId) || verifyAccount(tokenId)
         );
         res = IDIDAdaptor(dIDAdaptor[accountTypeOf[tokenId]]).disconnect(
             tokenId
@@ -397,8 +345,11 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
         external
         mustInitialized
     {
-        require(msg.sender == _ownerOf(fromToken), "check token owner fail");
-        require(_exists(toToken));
+        require(
+            msg.sender == INFT(idnft).ownerOf(fromToken),
+            "check token owner fail"
+        );
+        require(INFT(idnft).exists(toToken));
         _merge(fromToken, toToken);
         bytes memory args = abi.encode(fromToken, toToken);
         bytes memory message = abi.encode(FuncMerge, args);
@@ -420,17 +371,17 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
      * @dev Merges 2 idcards locally.
      */
     function _merge(uint256 fromToken, uint256 toToken) internal {
-        if (!_exists(fromToken) || !_exists(toToken)) {
+        if (!INFT(idnft).exists(fromToken) || !INFT(idnft).exists(toToken)) {
             return;
         }
-        _burn(fromToken);
+        INFT(idnft).burn(fromToken);
         emit Merge(fromToken, toToken);
     }
 
     /// @dev Calls registered ledgers to merge tokens.
     function mergeLedgers(uint256 fromToken, uint256 toToken) internal {
         require(fromToken != toToken);
-        require(_exists(toToken));
+        require(INFT(idnft).exists(toToken));
         for (uint256 i = 0; i < ledgers.length; i++) {
             try ILedger(ledgers[i]).merge(fromToken, toToken) {} catch {
                 emit MergeError(ledgers[i], fromToken, toToken);
@@ -438,76 +389,33 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
         }
     }
 
-    /// @dev Sign IDCard to remote chains.
-    function signin(
+    /// @dev Login to remote chains.
+    function login(
         uint256 tokenId,
         uint256[] calldata toChainIDs,
         address receiverWallet
     ) external mustInitialized {
         bytes memory args = abi.encode(tokenId, receiverWallet);
-        bytes memory message = abi.encode(FuncSignin, args);
+        bytes memory message = abi.encode(FuncLogin, args);
         for (uint256 i = 0; i < toChainIDs.length; i++) {
             IMessageChannel(messageChannel).send(chains[i], message);
         }
-        emit Signin(tokenId, toChainIDs, receiverWallet);
+        emit Login(tokenId, toChainIDs, receiverWallet);
     }
 
-    function onSigninMessage(bytes memory message) internal {
+    function onLoginMessage(bytes memory message) internal {
         (uint256 tokenId, address receiverWallet) = abi.decode(
             message,
             (uint256, address)
         );
-        _mint(receiverWallet, tokenId);
-        emit Signin(tokenId, receiverWallet);
-    }
-
-    /// @dev Returns token URI.
-    function tokenURI(uint256 tokenId)
-        public
-        view
-        virtual
-        override
-        returns (string memory)
-    {
-        _requireMinted(tokenId);
-        return _tokenURI(tokenId);
-    }
-
-    function _tokenURI(uint256 _tokenId)
-        internal
-        view
-        returns (string memory output)
-    {
-        uint256 lvl = IMultiHonor(honor).Level(_tokenId);
-        output = string(abi.encodePacked(_baseURI_, toString(lvl)));
-    }
-
-    function toString(uint256 value) internal pure returns (string memory) {
-        // Inspired by OraclizeAPI's implementation - MIT license
-        // https://github.com/oraclize/ethereum-api/blob/b42146b063c7d6ee1358846c198246239e9360e8/oraclizeAPI_0.4.25.sol
-
-        if (value == 0) {
-            return "0";
-        }
-        uint256 temp = value;
-        uint256 digits;
-        while (temp != 0) {
-            digits++;
-            temp /= 10;
-        }
-        bytes memory buffer = new bytes(digits);
-        while (value != 0) {
-            digits -= 1;
-            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
-            value /= 10;
-        }
-        return string(buffer);
+        INFT(idnft).mint(receiverWallet, tokenId);
+        emit Login(tokenId, receiverWallet);
     }
 
     function supportsInterface(bytes4 interfaceID)
         public
         view
-        override(AccessControlUpgradeable, ERC721EnumerableUpgradeable)
+        override
         returns (bool)
     {
         return false;
