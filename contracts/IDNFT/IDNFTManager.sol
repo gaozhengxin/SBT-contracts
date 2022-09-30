@@ -109,7 +109,7 @@ contract IDCard_V2_Manager is AccessControlUpgradeable {
     event Connect(uint256 tokenId, bytes32 accountType, bytes signinfo);
     event Disconnect(uint256 tokenId, bytes32 accountType);
 
-    event Login(uint256 tokenId, uint256[] toChainIDs, address receiverWallet);
+    event LoginRequest(uint256 tokenId, uint256[] toChainIDs, address receiverWallet);
     event Login(uint256 tokenId, address receiverWallet);
 
     event MergeLocal(uint256 fromToken, uint256 toToken);
@@ -400,7 +400,7 @@ contract IDCard_V2_Manager is AccessControlUpgradeable {
         for (uint256 i = 0; i < toChainIDs.length; i++) {
             IMessageChannel(messageChannel).send(chains[i], message);
         }
-        emit Login(tokenId, toChainIDs, receiverWallet);
+        emit LoginRequest(tokenId, toChainIDs, receiverWallet);
     }
 
     function onLoginMessage(bytes memory message) internal {
