@@ -18,8 +18,15 @@ contract BABTAdaptor is IDIDAdaptor {
 
     mapping(uint256 => uint256) public babtOf; // idcard => binance sbt
 
+    event InitAdaptor(address idcard, address babt);
     event ConnectBABT(uint256 tokenId, uint256 babtId);
     event DisconnectBABT(uint256 tokenId, uint256 babtId);
+
+    constructor(address idcard_, address babt_) {
+        idcard = idcard_;
+        babt = babt_;
+        emit InitAdaptor(idcard, babt);
+    }
 
     function connect(
         uint256 tokenId,
