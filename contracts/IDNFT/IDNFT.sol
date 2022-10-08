@@ -25,7 +25,7 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     uint256 maxTokenIdId;
     uint256 public nextTokenId;
 
-    string _baseURI_;
+    string public _baseURI_;
     address public honor;
 
     event InitV2();
