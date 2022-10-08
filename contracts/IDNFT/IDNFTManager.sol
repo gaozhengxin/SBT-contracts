@@ -109,7 +109,11 @@ contract IDCard_V2_Manager is AccessControlUpgradeable {
     event Connect(uint256 tokenId, bytes32 accountType, bytes signinfo);
     event Disconnect(uint256 tokenId, bytes32 accountType);
 
-    event LoginRequest(uint256 tokenId, uint256[] toChainIDs, address receiverWallet);
+    event LoginRequest(
+        uint256 tokenId,
+        uint256[] toChainIDs,
+        address receiverWallet
+    );
     event Login(uint256 tokenId, address receiverWallet);
 
     event MergeLocal(uint256 fromToken, uint256 toToken);
@@ -160,7 +164,11 @@ contract IDCard_V2_Manager is AccessControlUpgradeable {
     }
 
     function _setMessageChannel(address messageChannel_) internal {
+        if (messageChannel != address(0)) {
+            _revokeRole(ROLE_MESSAGE, messageChannel);
+        }
         messageChannel = messageChannel_;
+        _grantRole(ROLE_MESSAGE, messageChannel);
         emit SetMessageChannel(messageChannel);
     }
 
