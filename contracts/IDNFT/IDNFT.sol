@@ -15,17 +15,12 @@ interface IMultiHonor {
 /**
  * ID card NFT is a collection of crosschain composable DID NFT.
  */
-contract IDCard_V2 is
-    ERC721EnumerableUpgradeable,
-    AccessControlUpgradeable
-{
+contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     bytes32 public constant ROLE_ADMIN = keccak256("ROLE_ADMIN");
     bytes32 public constant ROLE_MANAGER = keccak256("ROLE_MANAGER");
 
     bool public transferable;
     mapping(uint256 => bool) public isAllowTransfer;
-
-    address public manager;
 
     uint256 maxTokenIdId;
     uint256 public nextTokenId;
@@ -34,8 +29,6 @@ contract IDCard_V2 is
     address public honor;
 
     event InitV2();
-
-    event SetManager(address core);
 
     event SetBaseURI(string baseURI);
 
@@ -57,23 +50,11 @@ contract IDCard_V2 is
     }
 
     /// @dev Initializes V2 settings.
-    function initV2(address manager, bool transferable_) public {
+    function initV2(bool transferable_) public {
         _checkRole(ROLE_ADMIN);
-        _setManager(manager);
         _setBaseURI("ipfs://QmTYwELcSgghx32VMsSGgWFQvCAqZ5tg6kKaPh2MSJfwAj/");
         _setTransferable(transferable_);
         emit InitV2();
-    }
-
-    /// @dev Sets IDNFT manager.
-    function setManager(address manager) external {
-        _checkRole(ROLE_ADMIN);
-        _setManager(manager);
-    }
-
-    function _setManager(address manager_) internal {
-        manager = manager_;
-        emit SetManager(manager);
     }
 
     /// @dev Sets base URI.
@@ -108,8 +89,7 @@ contract IDCard_V2 is
     /// @dev Sets tokenId as transferable.
     function allowTransfer(uint256 tokenId) external {
         require(
-            hasRole(ROLE_ADMIN, msg.sender) ||
-                hasRole(ROLE_MANAGER, msg.sender)
+            hasRole(ROLE_ADMIN, msg.sender) || hasRole(ROLE_MANAGER, msg.sender)
         );
         isAllowTransfer[tokenId] = true;
         emit AllowTransfer(tokenId);
@@ -118,8 +98,7 @@ contract IDCard_V2 is
     /// @dev Sets tokenId as non-transferable.
     function forbidTransfer(uint256 tokenId) external {
         require(
-            hasRole(ROLE_ADMIN, msg.sender) ||
-                hasRole(ROLE_MANAGER, msg.sender)
+            hasRole(ROLE_ADMIN, msg.sender) || hasRole(ROLE_MANAGER, msg.sender)
         );
         isAllowTransfer[tokenId] = false;
         emit ForbidTransfer(tokenId);
