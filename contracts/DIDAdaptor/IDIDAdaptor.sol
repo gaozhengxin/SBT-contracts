@@ -13,7 +13,7 @@ interface IDIDAdaptor {
         bytes memory sign_info
     ) external virtual returns (bool);
 
-    function verifyAccount(uint256 tokenId, address owner)
+    function verifyAccount(uint256 tokenId)
         external
         view
         virtual

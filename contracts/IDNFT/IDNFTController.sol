@@ -31,10 +31,7 @@ interface IDIDAdaptor {
         bytes memory sign_info
     ) external returns (bool);
 
-    function verifyAccount(uint256 tokenId, address owner)
-        external
-        view
-        returns (bool);
+    function verifyAccount(uint256 tokenId) external view returns (bool);
 
     function disconnect(uint256 tokenId) external virtual returns (bool);
 }
@@ -315,11 +312,7 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
         if (accountType == AccountType_Default) {
             return allowBlankSignup;
         }
-        return
-            IDIDAdaptor(dIDAdaptor[accountType]).verifyAccount(
-                tokenId,
-                msg.sender
-            );
+        return IDIDAdaptor(dIDAdaptor[accountType]).verifyAccount(tokenId);
     }
 
     /// @dev Update idcard's DID.

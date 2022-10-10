@@ -61,14 +61,26 @@ contract BABTAdaptor is IDIDAdaptor {
         return true;
     }
 
-    function verifyAccount(uint256 tokenId, address owner)
+    function verifyAccount(uint256 tokenId)
         public
         view
         override
+        returns (bool res)
+    {
+        try this.equalOwner(tokenId, babtOf[tokenId]) returns (bool equal) {
+            res = equal;
+        } catch {
+            res = false;
+        }
+        return res;
+    }
+
+    function equalOwner(uint256 tokenId, uint256 babtId)
+        public
+        view
         returns (bool)
     {
-        return (IDCard(idcard).ownerOf(tokenId) ==
-            IBABT(babt).ownerOf(babtOf[tokenId]));
+        return (IDCard(idcard).ownerOf(tokenId) == IBABT(babt).ownerOf(babtId));
     }
 
     function getSignInfo(uint256 tokenId) external pure returns (bytes memory) {
