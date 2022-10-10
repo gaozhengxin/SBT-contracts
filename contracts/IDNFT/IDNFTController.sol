@@ -73,8 +73,8 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
     /// @dev Peer chains.
     uint256[] public chains;
     mapping(address => mapping(bytes4 => bool)) public callerPermission; // caller -> function -> allowed
-    bytes4 FuncMerge = bytes4(keccak256("merge"));
-    bytes4 FuncLogin = bytes4(keccak256("login"));
+    bytes4 public constant FuncMerge = bytes4(keccak256("merge"));
+    bytes4 public constant FuncLogin = bytes4(keccak256("login"));
 
     /// @dev Type of DID that IDCard is connected to.
     mapping(uint256 => bytes32) public accountTypeOf;
