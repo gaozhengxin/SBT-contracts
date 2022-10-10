@@ -54,13 +54,13 @@ interface INFT {
 }
 
 /**
- * @notice ID card manager allow DAO users to
+ * @notice ID card controller allow DAO users to
  * claim ID card,
  * connect and disconnect idcard with 3rd party DID account,
  * login to remote chains,
  * merge idcards.
  */
-contract IDCard_V2_Manager is AccessControlUpgradeable {
+contract IDCard_V2_Controller is AccessControlUpgradeable {
     bytes32 public constant ROLE_ADMIN = keccak256("ROLE_ADMIN");
     bytes32 public constant ROLE_MESSAGE = keccak256("ROLE_MESSAGE");
 
@@ -92,7 +92,7 @@ contract IDCard_V2_Manager is AccessControlUpgradeable {
     /// @dev Allow claim IDCard without connecting to any DID.
     bool allowBlankSignup = false;
 
-    event InitV2Manager();
+    event InitV2Controller();
 
     event SetNFT(address idnft);
 
@@ -136,14 +136,14 @@ contract IDCard_V2_Manager is AccessControlUpgradeable {
     }
 
     /// @dev Initializes V2 settings.
-    function initV2Manager(address idnft, address messageChannel_) public {
+    function initV2Controller(address idnft, address messageChannel_) public {
         _checkRole(ROLE_ADMIN);
         require(!v2Initialized);
         maxTokenIdId = 1000000000;
         _setNFT(idnft);
         _setMessageChannel(messageChannel_);
         v2Initialized = true;
-        emit InitV2Manager();
+        emit InitV2Controller();
     }
 
     /// @dev Sets IDNFT.

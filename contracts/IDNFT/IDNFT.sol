@@ -6,7 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
-import "./IDNFTManager.sol";
+import "./IDNFTController.sol";
 
 interface IMultiHonor {
     function Level(uint256 tokenId) external view returns (uint8);
@@ -17,7 +17,7 @@ interface IMultiHonor {
  */
 contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     bytes32 public constant ROLE_ADMIN = keccak256("ROLE_ADMIN");
-    bytes32 public constant ROLE_MANAGER = keccak256("ROLE_MANAGER");
+    bytes32 public constant ROLE_CONTROLLER = keccak256("ROLE_CONTROLLER");
 
     bool public transferable;
     mapping(uint256 => bool) public isAllowTransfer;
@@ -89,7 +89,8 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     /// @dev Sets tokenId as transferable.
     function allowTransfer(uint256 tokenId) external {
         require(
-            hasRole(ROLE_ADMIN, msg.sender) || hasRole(ROLE_MANAGER, msg.sender)
+            hasRole(ROLE_ADMIN, msg.sender) ||
+                hasRole(ROLE_CONTROLLER, msg.sender)
         );
         isAllowTransfer[tokenId] = true;
         emit AllowTransfer(tokenId);
@@ -98,7 +99,8 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     /// @dev Sets tokenId as non-transferable.
     function forbidTransfer(uint256 tokenId) external {
         require(
-            hasRole(ROLE_ADMIN, msg.sender) || hasRole(ROLE_MANAGER, msg.sender)
+            hasRole(ROLE_ADMIN, msg.sender) ||
+                hasRole(ROLE_CONTROLLER, msg.sender)
         );
         isAllowTransfer[tokenId] = false;
         emit ForbidTransfer(tokenId);
@@ -130,12 +132,12 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     }
 
     function mint(address owner, uint256 tokenId) external {
-        _checkRole(ROLE_MANAGER);
+        _checkRole(ROLE_CONTROLLER);
         _mint(owner, tokenId);
     }
 
     function burn(uint256 tokenId) external {
-        _checkRole(ROLE_MANAGER);
+        _checkRole(ROLE_CONTROLLER);
         _burn(tokenId);
     }
 
