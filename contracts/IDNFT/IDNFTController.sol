@@ -197,6 +197,11 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
         emit SetDIDAdaptor(key, keccak256(bytes(key)), adaptor);
     }
 
+    /// @dev Returns DID type hash.
+    function dIDType(string memory key) public pure returns (bytes32) {
+        return keccak256(bytes(key));
+    }
+
     /// @dev Register ledger.
     function registerLedgers(address ledger) external {
         _checkRole(ROLE_ADMIN);
