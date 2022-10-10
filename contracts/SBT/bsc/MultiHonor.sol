@@ -40,6 +40,7 @@ contract MultiHonor_Multichain is
     }
 
     address public IDCard;
+    address public controller;
     bytes32 public constant ROLE_ADD_POC = keccak256("ROLE_ADD_POC");
     bytes32 public constant ROLE_SET_POC = keccak256("ROLE_SET_POC");
     bytes32 public constant ROLE_SET_VEPOWER = keccak256("ROLE_SET_VEPOWER");
@@ -64,6 +65,7 @@ contract MultiHonor_Multichain is
     event SetEventPoint(uint256[] ids, uint64[] eventPower);
     event AddEventPoint(uint256[] ids, uint64[] eventPower);
     event SetIDCard(address idcard);
+    event SetController(address controller);
 
     function __initSBT() internal {
         weight_poc = 600;
@@ -78,6 +80,12 @@ contract MultiHonor_Multichain is
         emit SetIDCard(IDCard);
     }
 
+    function setIDController(address controller_) external {
+        _checkRole(DEFAULT_ADMIN_ROLE);
+        controller = controller_;
+        emit SetController(controller);
+    }
+
     struct POCInfo {
         uint64 POC;
         uint64 timestamp;
@@ -89,7 +97,7 @@ contract MultiHonor_Multichain is
     event Merge(uint256 fromToken, uint256 toToken);
 
     function merge(uint256 fromToken, uint256 toToken) external override {
-        require(msg.sender == IDCard);
+        require(msg.sender == controller);
         // Merge POC
         pocInfo[toToken].POC = this.POC(toToken) + this.POC(fromToken);
         pocInfo[toToken].timestamp = uint64(block.timestamp);
@@ -250,9 +258,9 @@ contract MultiHonor_Multichain is
             account != address(0),
             "ERC1155: address zero is not a valid owner"
         );
-        try IERC721Enumerable(IDCard).tokenOfOwnerByIndex(account, 0) returns (
-            uint256 tokenId
-        ) {
+        try
+            IERC721Enumerable(controller).tokenOfOwnerByIndex(account, 0)
+        returns (uint256 tokenId) {
             if (id == 0) {
                 balance = uint256(this.TotalPoint(tokenId));
             }

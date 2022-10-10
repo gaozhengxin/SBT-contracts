@@ -272,7 +272,6 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
         require(_connect(tokenId, accountType, sign_info));
         INFT(idnft).allowTransfer(tokenId);
         INFT(idnft).mint(msg.sender, tokenId);
-        INFT(idnft).forbidTransfer(tokenId);
         nextTokenId++;
         emit Claim(tokenId, msg.sender);
     }
@@ -340,6 +339,7 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
         if (res) {
             accountTypeOf[tokenId] = bytes32(0);
         }
+        INFT(idnft).forbidTransfer(tokenId);
         emit Disconnect(tokenId, accountTypeOf[tokenId]);
     }
 
@@ -380,6 +380,8 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
         if (!INFT(idnft).exists(fromToken) || !INFT(idnft).exists(toToken)) {
             return;
         }
+        mergeLedgers(fromToken, toToken);
+        INFT(idnft).allowTransfer(fromToken);
         INFT(idnft).burn(fromToken);
         emit Merge(fromToken, toToken);
     }

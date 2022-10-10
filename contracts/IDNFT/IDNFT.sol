@@ -119,7 +119,6 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
             "transfer is forbidden"
         );
         isAllowTransfer[tokenId] = false;
-        require(balanceOf(to) == 0, "receiver already has an ID card");
     }
 
     /// @dev Returns birth chain of the IDCard.
