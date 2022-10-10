@@ -13,19 +13,25 @@ interface IDCard {
 
 contract BABTAdaptor is IDIDAdaptor {
     bytes32 constant AccountType_Binance = keccak256("BABT");
-    address idcard;
-    address babt;
+    address public idcard;
+    address public controller;
+    address public babt;
 
     mapping(uint256 => uint256) public babtOf; // idcard => binance sbt
 
-    event InitAdaptor(address idcard, address babt);
+    event InitAdaptor(address idcard, address controller, address babt);
     event ConnectBABT(uint256 tokenId, uint256 babtId);
     event DisconnectBABT(uint256 tokenId, uint256 babtId);
 
-    constructor(address idcard_, address babt_) {
+    constructor(
+        address idcard_,
+        address controller_,
+        address babt_
+    ) {
         idcard = idcard_;
+        controller = controller_;
         babt = babt_;
-        emit InitAdaptor(idcard, babt);
+        emit InitAdaptor(idcard, controller, babt);
     }
 
     function connect(
@@ -34,7 +40,7 @@ contract BABTAdaptor is IDIDAdaptor {
         bytes32 accountType,
         bytes memory sign_info
     ) public override returns (bool) {
-        require(msg.sender == idcard);
+        require(msg.sender == controller);
         if (accountType == AccountType_Binance) {
             uint256 babtId = abi.decode(sign_info, (uint256));
             if (claimer != IBABT(babt).ownerOf(babtId)) {
@@ -48,7 +54,7 @@ contract BABTAdaptor is IDIDAdaptor {
     }
 
     function disconnect(uint256 tokenId) external override returns (bool) {
-        require(msg.sender == idcard);
+        require(msg.sender == controller);
         uint256 babtId = babtOf[tokenId];
         babtOf[tokenId] = 0;
         emit DisconnectBABT(tokenId, babtId);
@@ -61,7 +67,8 @@ contract BABTAdaptor is IDIDAdaptor {
         override
         returns (bool)
     {
-        return (IDCard(idcard).ownerOf(tokenId) == IBABT(babt).ownerOf(babtOf[tokenId]));
+        return (IDCard(idcard).ownerOf(tokenId) ==
+            IBABT(babt).ownerOf(babtOf[tokenId]));
     }
 
     function getSignInfo(uint256 tokenId) external pure returns (bytes memory) {
