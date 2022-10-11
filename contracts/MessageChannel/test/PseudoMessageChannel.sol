@@ -9,9 +9,11 @@ contract PseudoMessageChannel is MessageChannelBase {
         emit Send(toChainID, message);
     }
 
-    address public caller = address(0);
-
-    function receiveMessage(address client, bytes memory message) external {
+    function receiveMessage(
+        address client,
+        address caller,
+        bytes memory message
+    ) external {
         onReceive(client, caller, message);
     }
 }
