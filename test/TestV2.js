@@ -72,7 +72,7 @@ describe("IDNFT V2", function () {
 
     // init idnft
     console.log("\ninit idnft");
-    await idnft.initV2(false);
+    await idnft.initV2();
     expect(await idnft._baseURI_()).to.equal("ipfs://QmTYwELcSgghx32VMsSGgWFQvCAqZ5tg6kKaPh2MSJfwAj/");
 
     // grant controller admin role
@@ -92,10 +92,10 @@ describe("IDNFT V2", function () {
     console.log("\nset caller permission");
     let func_merge = await controller.FuncMerge();
     console.log("func merge " + func_merge);
-    await controller.setCallerPermission(mc.address, func_merge, true);
-    let func_login = await controller.FuncLogin();
-    console.log("func login " + func_login);
-    await controller.setCallerPermission(mc.address, func_login, true);
+    await controller.setCallerPermission(owner.address, func_merge, true);
+    let func_register = await controller.FuncRegister();
+    console.log("func register " + func_register);
+    await controller.setCallerPermission(owner.address, func_register, true);
 
     // deploy babt
     console.log("\ndeploy babt");
@@ -127,7 +127,7 @@ describe("IDNFT V2", function () {
     console.log("Sign info 0 " + signInfo_0);
 
     let tx = await controller.claim(type_babt, signInfo_0);
-    const rc = await tx.wait(); // 0ms, as tx is already confirmed
+    const rc = await tx.wait();
     const event = rc.events.find(event => event.event === 'Claim');
     const [tokenId0, tokenOwner0] = event.args;
     console.log("Token id 0 " + tokenId0); // 31337000000000
@@ -164,7 +164,7 @@ describe("IDNFT V2", function () {
     console.log("Sign info 2 " + signInfo_2);
 
     let tx2 = await controller.claim(type_babt, signInfo_2);
-    const rc2 = await tx2.wait(); // 0ms, as tx is already confirmed
+    const rc2 = await tx2.wait();
     const event2 = rc2.events.find(event => event.event === 'Claim');
     const [tokenId1, tokenOwner1] = event2.args;
     console.log("Token id 1 " + tokenId1); // 31337000000001
@@ -219,7 +219,8 @@ describe("IDNFT V2", function () {
     let tx3 = await controller.merge(tokenId1, tokenId0);
     let rc3 = await tx3.wait();
     expect(await idnft.balanceOf(owner.address)).to.equal(1);
-    //expect(await sbt.POC(tokenId0)).to.equal(400); // sbt.POC is not a function, strange
+    let poc = await sbt.poc(tokenId0);
+    expect(poc).to.equal(300);
     expect(await sbt.EventPoint(tokenId0)).to.equal(700);
     expect(await sbt.EventPoint(tokenId1)).to.equal(0);
     expect(await sbt.TotalPoint(tokenId0)).to.equal(250);
@@ -240,26 +241,89 @@ describe("IDNFT V2", function () {
 
     let [toChainID, message] = event_send.args;
     expect(toChainID).to.equal(627);
-    console.log("message " + message);
+    console.log("merge message " + message);
     expect(message).to.equal(
       ethers.utils.defaultAbiCoder.encode(
         ["bytes4", "bytes"],
-        [0xf611b776, ethers.utils.defaultAbiCoder.encode(
+        [func_merge, ethers.utils.defaultAbiCoder.encode(
           ["uint256", "uint256"],
           [tokenId1, tokenId0]
         )]
       )
     );
 
-    // remote login
+    // remote register
+    console.log("\nremote register");
+    let tx4 = await controller.register(tokenId0, [627], owner.address);
+    let rc4 = await tx4.wait();
 
-    // check log: sending remote login message
+    // check log: sending register message
+    let event4 = rc4.events.find(event => event.address === mc.address);
+    let event_register_request_message = iface.parseLog(event4);
 
-    // simulate receive login message
+    let [toChainID2, register_request_message] = event_register_request_message.args;
+    expect(toChainID2).to.equal(627);
+    console.log("register message " + register_request_message);
+    expect(register_request_message).to.equal(
+      ethers.utils.defaultAbiCoder.encode(
+        ["bytes4", "bytes"],
+        [func_register, ethers.utils.defaultAbiCoder.encode(
+          ["uint256", "address"],
+          [tokenId0, owner.address]
+        )]
+      )
+    );
+
+    // simulate receive register message
+    console.log("\nsimulate receive register message");
+    let tokenId_1370 = 137000000000;
+    let register_message = ethers.utils.defaultAbiCoder.encode(
+      ["bytes4", "bytes"],
+      [func_register, ethers.utils.defaultAbiCoder.encode(
+        ["uint256", "address"],
+        [tokenId_1370, owner.address]
+      )]
+    );
+    await mc.receiveMessage(controller.address, owner.address, register_message);
+    console.log("balance " + await idnft.balanceOf(owner.address));
+    console.log("1370 owner " + await idnft.ownerOf(tokenId_1370));
+    expect(await idnft.ownerOf(tokenId_1370)).to.equal(owner.address);
 
     // simulate receive merge message
-    // 1. both tokens exist
-    // 2. either token does not exist
+    console.log("\nsimulate receive merge message");
+    console.log("total supply " + await idnft.totalSupply());
+    // 1. both tokens exist (137000000000 -> 31337000000000)
+    let message_merge_1 = ethers.utils.defaultAbiCoder.encode(
+      ["bytes4", "bytes"],
+      [func_merge, ethers.utils.defaultAbiCoder.encode(
+        ["uint256", "uint256"],
+        [tokenId_1370, tokenId0]
+      )]
+    );
+    console.log("message merge 1 " + message_merge_1);
+    await mc.receiveMessage(controller.address, owner.address, message_merge_1);
+    console.log("total supply " + await idnft.totalSupply());
+    // 2. either token does not exist (31337000000001 -> 31337000000000, 31337000000000 -> 31337000000001)
+    let message_merge_2 = ethers.utils.defaultAbiCoder.encode(
+      ["bytes4", "bytes"],
+      [func_merge, ethers.utils.defaultAbiCoder.encode(
+        ["uint256", "uint256"],
+        [tokenId1, tokenId0]
+      )]
+    );
+    console.log("message merge 2 " + message_merge_2);
+    await mc.receiveMessage(controller.address, owner.address, message_merge_2);
+    console.log("total supply " + await idnft.totalSupply());
+    let message_merge_3 = ethers.utils.defaultAbiCoder.encode(
+      ["bytes4", "bytes"],
+      [func_merge, ethers.utils.defaultAbiCoder.encode(
+        ["uint256", "uint256"],
+        [tokenId0, tokenId1]
+      )]
+    );
+    console.log("message merge 3 " + message_merge_3);
+    await mc.receiveMessage(controller.address, owner.address, message_merge_3);
+    console.log("total supply " + await idnft.totalSupply());
 
   });
 });
