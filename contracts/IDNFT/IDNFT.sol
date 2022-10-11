@@ -19,9 +19,6 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     bytes32 public constant ROLE_ADMIN = keccak256("ROLE_ADMIN");
     bytes32 public constant ROLE_CONTROLLER = keccak256("ROLE_CONTROLLER");
 
-    bool public transferable;
-    mapping(uint256 => bool) public isAllowTransfer;
-
     uint256 maxTokenIdId;
     uint256 public nextTokenId;
 
@@ -34,7 +31,6 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
 
     event SetHonor(address honor);
 
-    event SetTransferable(bool transferable);
     event AllowTransfer(uint256 tokenId);
     event ForbidTransfer(uint256 tokenId);
 
@@ -50,10 +46,8 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
     }
 
     /// @dev Initializes V2 settings.
-    function initV2(bool transferable_) public {
-        _checkRole(ROLE_ADMIN);
+    function initV2() public {
         _setBaseURI("ipfs://QmTYwELcSgghx32VMsSGgWFQvCAqZ5tg6kKaPh2MSJfwAj/");
-        _setTransferable(transferable_);
         emit InitV2();
     }
 
@@ -73,52 +67,6 @@ contract IDCard_V2 is ERC721EnumerableUpgradeable, AccessControlUpgradeable {
         _checkRole(ROLE_ADMIN);
         honor = honor_;
         emit SetHonor(honor);
-    }
-
-    /// @dev Sets IDCard NFT as transferable or non-transferable.
-    function setTransferable(bool transferable_) external {
-        _checkRole(ROLE_ADMIN);
-        _setTransferable(transferable_);
-    }
-
-    function _setTransferable(bool transferable_) internal {
-        transferable = transferable_;
-        emit SetTransferable(transferable);
-    }
-
-    /// @dev Sets tokenId as transferable.
-    function allowTransfer(uint256 tokenId) external {
-        require(
-            hasRole(ROLE_ADMIN, msg.sender) ||
-                hasRole(ROLE_CONTROLLER, msg.sender)
-        );
-        isAllowTransfer[tokenId] = true;
-        emit AllowTransfer(tokenId);
-    }
-
-    /// @dev Sets tokenId as non-transferable.
-    function forbidTransfer(uint256 tokenId) external {
-        require(
-            hasRole(ROLE_ADMIN, msg.sender) ||
-                hasRole(ROLE_CONTROLLER, msg.sender)
-        );
-        isAllowTransfer[tokenId] = false;
-        emit ForbidTransfer(tokenId);
-    }
-
-    /// @dev Check if token is transferable before transfer.
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) internal virtual override {
-        super._beforeTokenTransfer(from, to, tokenId);
-
-        require(
-            transferable || isAllowTransfer[tokenId],
-            "transfer is forbidden"
-        );
-        isAllowTransfer[tokenId] = false;
     }
 
     /// @dev Returns birth chain of the IDCard.

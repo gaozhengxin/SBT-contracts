@@ -44,17 +44,13 @@ interface INFT {
     function exists(uint256 tokenId) external view returns (bool);
 
     function ownerOf(uint256 tokenId) external view returns (address);
-
-    function allowTransfer(uint256 tokenId) external;
-
-    function forbidTransfer(uint256 tokenId) external;
 }
 
 /**
  * @notice ID card controller allow DAO users to
  * claim ID card,
  * connect and disconnect idcard with 3rd party DID account,
- * login to remote chains,
+ * register to remote chains,
  * merge idcards.
  */
 contract IDCard_V2_Controller is AccessControlUpgradeable {
@@ -74,7 +70,7 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
     uint256[] public chains;
     mapping(address => mapping(bytes4 => bool)) public callerPermission; // caller -> function -> allowed
     bytes4 public constant FuncMerge = bytes4(keccak256("merge"));
-    bytes4 public constant FuncLogin = bytes4(keccak256("login"));
+    bytes4 public constant FuncRegister = bytes4(keccak256("register"));
 
     /// @dev Type of DID that IDCard is connected to.
     mapping(uint256 => bytes32) public accountTypeOf;
@@ -106,12 +102,12 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
     event Connect(uint256 tokenId, bytes32 accountType, bytes signinfo);
     event Disconnect(uint256 tokenId, bytes32 accountType);
 
-    event LoginRequest(
+    event RegisterRequest(
         uint256 tokenId,
         uint256[] toChainIDs,
         address receiverWallet
     );
-    event Login(uint256 tokenId, address receiverWallet);
+    event Register(uint256 tokenId, address receiverWallet);
 
     event MergeLocal(uint256 fromToken, uint256 toToken);
     event Merge(uint256 fromToken, uint256 toToken);
@@ -241,9 +237,9 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
             onMergeMessage(args);
             return;
         }
-        if (func == FuncLogin) {
-            require(callerPermission[caller][FuncLogin]);
-            onLoginMessage(args);
+        if (func == FuncRegister) {
+            require(callerPermission[caller][FuncRegister]);
+            onRegisterMessage(args);
             return;
         }
     }
@@ -270,7 +266,6 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
         tokenId = nextTokenId;
         tokenId = tokenId + block.chainid * maxTokenIdId;
         require(_connect(tokenId, accountType, sign_info));
-        INFT(idnft).allowTransfer(tokenId);
         INFT(idnft).mint(msg.sender, tokenId);
         nextTokenId++;
         emit Claim(tokenId, msg.sender);
@@ -330,16 +325,13 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
 
     /// @dev Disconnect idcard with DID.
     function disconnect(uint256 tokenId) public returns (bool res) {
-        require(
-            msg.sender == INFT(idnft).ownerOf(tokenId) || verifyAccount(tokenId)
-        );
+        require(msg.sender == INFT(idnft).ownerOf(tokenId));
         res = IDIDAdaptor(dIDAdaptor[accountTypeOf[tokenId]]).disconnect(
             tokenId
         );
         if (res) {
             accountTypeOf[tokenId] = bytes32(0);
         }
-        INFT(idnft).forbidTransfer(tokenId);
         emit Disconnect(tokenId, accountTypeOf[tokenId]);
     }
 
@@ -381,7 +373,6 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
             return;
         }
         mergeLedgers(fromToken, toToken);
-        INFT(idnft).allowTransfer(fromToken);
         INFT(idnft).burn(fromToken);
         emit Merge(fromToken, toToken);
     }
@@ -397,27 +388,27 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
         }
     }
 
-    /// @dev Login to remote chains.
-    function login(
+    /// @dev Register to remote chains.
+    function register(
         uint256 tokenId,
         uint256[] calldata toChainIDs,
         address receiverWallet
     ) external mustInitialized {
         bytes memory args = abi.encode(tokenId, receiverWallet);
-        bytes memory message = abi.encode(FuncLogin, args);
+        bytes memory message = abi.encode(FuncRegister, args);
         for (uint256 i = 0; i < toChainIDs.length; i++) {
             IMessageChannel(messageChannel).send(chains[i], message);
         }
-        emit LoginRequest(tokenId, toChainIDs, receiverWallet);
+        emit RegisterRequest(tokenId, toChainIDs, receiverWallet);
     }
 
-    function onLoginMessage(bytes memory message) internal {
+    function onRegisterMessage(bytes memory message) internal {
         (uint256 tokenId, address receiverWallet) = abi.decode(
             message,
             (uint256, address)
         );
         INFT(idnft).mint(receiverWallet, tokenId);
-        emit Login(tokenId, receiverWallet);
+        emit Register(tokenId, receiverWallet);
     }
 
     function supportsInterface(bytes4 interfaceID)
