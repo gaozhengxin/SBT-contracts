@@ -155,6 +155,11 @@ contract MultiHonor_Multichain is
         return this.POC(tokenId, block.timestamp);
     }
 
+    // returns user's current POC
+    function poc(uint256 tokenId) external view returns (uint64) {
+        return this.POC(tokenId, block.timestamp);
+    }
+
     // returns user's average VEPower in current epoch
     function VEPower(uint256 tokenId) external view override returns (uint256) {
         if (currentVEEpoch() > veInfo[tokenId].epoch) {

@@ -126,6 +126,11 @@ contract MultiHonor_Multichain is
         return this.POC(tokenId, block.timestamp);
     }
 
+    // returns user's current POC
+    function poc(uint256 tokenId) external view returns (uint64) {
+        return this.POC(tokenId, block.timestamp);
+    }
+
     // returns user's current EventPoint
     function EventPoint(uint256 tokenId)
         external
