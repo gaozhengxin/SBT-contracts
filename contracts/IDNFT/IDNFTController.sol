@@ -82,9 +82,6 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
     /// @dev A list of MultiDAO subsystem contracts.
     address[] public ledgers;
 
-    /// @dev Allow claim IDCard without connecting to any DID.
-    bool allowBlankSignup = false;
-
     event InitV2Controller();
 
     event SetNFT(address idnft);
@@ -283,7 +280,6 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
     ) internal virtual returns (bool res) {
         require(accountTypeOf[tokenId] == bytes32(0));
         if (accountType == AccountType_Default) {
-            require(allowBlankSignup);
             res = true;
         }
         res = IDIDAdaptor(dIDAdaptor[accountType]).connect(
@@ -304,7 +300,7 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
         require(getChainID(tokenId) == block.chainid);
         bytes32 accountType = accountTypeOf[tokenId];
         if (accountType == AccountType_Default) {
-            return allowBlankSignup;
+            return false;
         }
         return IDIDAdaptor(dIDAdaptor[accountType]).verifyAccount(tokenId);
     }
