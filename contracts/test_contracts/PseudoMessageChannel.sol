@@ -1,6 +1,6 @@
 pragma solidity ^0.8.0;
 
-import "../MessageChannelBase.sol";
+import "../MessageChannel/MessageChannelBase.sol";
 
 contract PseudoMessageChannel is MessageChannelBase {
     event Send(uint256 toChainID, bytes message);

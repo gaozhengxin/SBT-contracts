@@ -45,7 +45,7 @@ describe("IDNFT V2", function () {
 
     // deploy pseudo message channel
     console.log("\ndeploy pseudo message channel");
-    let MC = await ethers.getContractFactory("PseudoMessageChannel");
+    let MC = await ethers.getContractFactory("test_contracts/PseudoMessageChannel.sol:PseudoMessageChannel");
     let mc = await MC.deploy();
     console.log("message channel " + mc.address);
 
