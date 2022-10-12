@@ -18,6 +18,7 @@ contract BABTAdaptor is IDIDAdaptor {
     address public babt;
 
     mapping(uint256 => uint256) public babtOf; // idcard => binance sbt
+    mapping(uint256 => bool) public babtUsed; // babt id => userd
 
     event InitAdaptor(address idcard, address controller, address babt);
     event ConnectBABT(uint256 tokenId, uint256 babtId);
@@ -43,9 +44,13 @@ contract BABTAdaptor is IDIDAdaptor {
         require(msg.sender == controller);
         if (accountType == AccountType_Binance) {
             uint256 babtId = abi.decode(sign_info, (uint256));
+            if (babtUsed[babtId]) {
+                return false;
+            }
             if (claimer != IBABT(babt).ownerOf(babtId)) {
                 return false;
             }
+            babtUsed[babtId] = true;
             babtOf[tokenId] = babtId;
             emit ConnectBABT(tokenId, babtId);
             return true;
@@ -56,6 +61,7 @@ contract BABTAdaptor is IDIDAdaptor {
     function disconnect(uint256 tokenId) external override returns (bool) {
         require(msg.sender == controller);
         uint256 babtId = babtOf[tokenId];
+        babtUsed[babtId] = false;
         babtOf[tokenId] = 0;
         emit DisconnectBABT(tokenId, babtId);
         return true;
