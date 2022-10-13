@@ -5,6 +5,8 @@ import "./IDIDAdaptor.sol";
 
 interface IDCard {
     function ownerOf(uint256 tokenId) external view returns (address owner);
+
+    function exists(uint256 tokenId) external view returns (bool);
 }
 
 interface IERC20 {
@@ -27,7 +29,7 @@ contract PremiumHolder is IDIDAdaptor {
     address public operator;
 
     mapping(uint256 => address) public premiumHolderOf; // idcard => premium holder
-    mapping(address => bool) public inPremium;
+    mapping(address => uint256) public idcardOf; // premium holder => idcard
     mapping(address => bytes32) nonceOf; // payer address => nonce
 
     event InitAdaptor(
@@ -65,7 +67,10 @@ contract PremiumHolder is IDIDAdaptor {
     ) public override returns (bool) {
         require(msg.sender == controller);
         if (accountType == AccountType_PAID) {
-            if (inPremium[claimer]) {
+            if (
+                idcardOf[claimer] != 0 &&
+                IDCard(idcard).exists(idcardOf[claimer])
+            ) {
                 return false;
             }
             address payer;
@@ -93,7 +98,7 @@ contract PremiumHolder is IDIDAdaptor {
             }
             _pay(payer);
             premiumHolderOf[tokenId] = claimer;
-            inPremium[claimer] = true;
+            idcardOf[claimer] = tokenId;
             emit ConnectPayer(tokenId, claimer);
             return true;
         }
@@ -117,7 +122,7 @@ contract PremiumHolder is IDIDAdaptor {
     function disconnect(uint256 tokenId) external override returns (bool) {
         require(msg.sender == controller);
         address premiumHolder = premiumHolderOf[tokenId];
-        inPremium[premiumHolder] = false;
+        idcardOf[premiumHolder] = 0;
         premiumHolderOf[tokenId] = address(0);
         emit DisconnectPayer(tokenId, premiumHolder);
         return true;

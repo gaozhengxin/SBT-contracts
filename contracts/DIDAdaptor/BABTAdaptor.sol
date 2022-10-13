@@ -9,6 +9,8 @@ interface IBABT {
 
 interface IDCard {
     function ownerOf(uint256 tokenId) external view returns (address owner);
+
+    function exists(uint256 tokenId) external view returns (bool);
 }
 
 contract BABTAdaptor is IDIDAdaptor {
@@ -18,7 +20,7 @@ contract BABTAdaptor is IDIDAdaptor {
     address public babt;
 
     mapping(uint256 => uint256) public babtOf; // idcard => binance sbt
-    mapping(uint256 => bool) public babtUsed; // babt id => userd
+    mapping(uint256 => uint256) public idcardOf; // babt id => idcard
 
     event InitAdaptor(address idcard, address controller, address babt);
     event ConnectBABT(uint256 tokenId, uint256 babtId);
@@ -44,13 +46,15 @@ contract BABTAdaptor is IDIDAdaptor {
         require(msg.sender == controller);
         if (accountType == AccountType_Binance) {
             uint256 babtId = abi.decode(sign_info, (uint256));
-            if (babtUsed[babtId]) {
+            if (
+                idcardOf[babtId] != 0 && IDCard(idcard).exists(idcardOf[babtId])
+            ) {
                 return false;
             }
             if (claimer != IBABT(babt).ownerOf(babtId)) {
                 return false;
             }
-            babtUsed[babtId] = true;
+            idcardOf[babtId] = tokenId;
             babtOf[tokenId] = babtId;
             emit ConnectBABT(tokenId, babtId);
             return true;
@@ -61,7 +65,7 @@ contract BABTAdaptor is IDIDAdaptor {
     function disconnect(uint256 tokenId) external override returns (bool) {
         require(msg.sender == controller);
         uint256 babtId = babtOf[tokenId];
-        babtUsed[babtId] = false;
+        idcardOf[babtId] = 0;
         babtOf[tokenId] = 0;
         emit DisconnectBABT(tokenId, babtId);
         return true;

@@ -6,6 +6,8 @@ import {MMR} from "../lib/mmr/MMR.sol";
 
 interface IDCard {
     function ownerOf(uint256 tokenId) external view returns (address owner);
+
+    function exists(uint256 tokenId) external view returns (bool);
 }
 
 interface IERC20 {
@@ -26,8 +28,8 @@ contract WhiteHolder is IDIDAdaptor {
     address public operator;
     bytes32 public currentRoot;
 
-    mapping(uint256 => address) public whiteHolderOf; // idcard => premium holder
-    mapping(address => bool) public checkedIn;
+    mapping(uint256 => address) public whiteHolderOf; // idcard => white holder
+    mapping(address => uint256) public idcardOf; // white holder => idcard
 
     event InitAdaptor(address idcard, address controller, address operator);
     event ConnectPayer(uint256 tokenId, address premiumHolder);
@@ -52,8 +54,14 @@ contract WhiteHolder is IDIDAdaptor {
     ) public override returns (bool) {
         require(msg.sender == controller);
         if (accountType == AccountType_White) {
+            if (
+                idcardOf[claimer] != 0 &&
+                IDCard(idcard).exists(idcardOf[claimer])
+            ) {
+                return false;
+            }
             if (verify(claimer, sign_info)) {
-                checkedIn[claimer] = true;
+                idcardOf[claimer] = tokenId;
                 return true;
             }
         }
@@ -64,7 +72,7 @@ contract WhiteHolder is IDIDAdaptor {
     function disconnect(uint256 tokenId) external override returns (bool) {
         require(msg.sender == controller);
         address whiteHolder = whiteHolderOf[tokenId];
-        checkedIn[whiteHolder] = false;
+        idcardOf[whiteHolder] = 0;
         whiteHolderOf[tokenId] = address(0);
         emit DisconnectPayer(tokenId, whiteHolder);
         return true;
