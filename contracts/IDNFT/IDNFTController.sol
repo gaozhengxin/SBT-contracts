@@ -297,7 +297,6 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
 
     /// @dev Verifies if the IDCard holder is the owner of DID that is currently connecting to the IDCard.
     function verifyAccount(uint256 tokenId) public view virtual returns (bool) {
-        require(getChainID(tokenId) == block.chainid);
         bytes32 accountType = accountTypeOf[tokenId];
         if (accountType == AccountType_Default) {
             return false;
