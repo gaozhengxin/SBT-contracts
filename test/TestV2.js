@@ -325,5 +325,10 @@ describe("IDNFT V2", function () {
     await mc.receiveMessage(controller.address, owner.address, message_merge_3);
     console.log("total supply " + await idnft.totalSupply());
 
+    // TODO test reuse DID after old ID card is burnt
+
+    // TODO test premium holder
+
+    // TODO test white holder
   });
 });
