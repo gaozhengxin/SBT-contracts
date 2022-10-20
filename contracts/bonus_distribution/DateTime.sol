@@ -158,6 +158,11 @@ contract DateTime {
                 return toTimestamp(year, month, day, 0, 0, 0);
         }
 
+        /// @dev add toTimestamp1 for testing because hardhat doesnt work with overload functions
+        function toTimestamp1(uint16 year, uint8 month, uint8 day) public pure returns (uint timestamp) {
+                return toTimestamp(year, month, day, 0, 0, 0);
+        }
+
         function toTimestamp(uint16 year, uint8 month, uint8 day, uint8 hour) public pure returns (uint timestamp) {
                 return toTimestamp(year, month, day, hour, 0, 0);
         }
