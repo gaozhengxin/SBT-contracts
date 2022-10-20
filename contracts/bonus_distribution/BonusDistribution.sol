@@ -28,16 +28,113 @@ interface IMultiHonor {
     function POC(uint256 tokenId) external view returns (uint64);
 }
 
-contract BonusDistributor is IBonusDistributor, DateTime {
+abstract contract Administrable {
+    address public admin;
+    address public pendingAdmin;
+
+    event SetAdmin(address admin);
+    event TransferAdmin(address pendingAdmin);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin);
+        _;
+    }
+
+    function _setAdmin(address admin_) internal {
+        admin = admin_;
+        emit SetAdmin(admin);
+    }
+
+    function transferAdmin(address admin_) external onlyAdmin {
+        pendingAdmin = admin_;
+        emit TransferAdmin(pendingAdmin);
+    }
+
+    function acceptAdmin() external {
+        require(msg.sender == pendingAdmin);
+        _setAdmin(pendingAdmin);
+        pendingAdmin = address(0);
+    }
+}
+
+abstract contract AdminPausable is Administrable {
+    bool public paused;
+
+    event Pause();
+
+    modifier mustNotPaused() {
+        require(!paused);
+        _;
+    }
+
+    modifier mustPaused() {
+        require(paused);
+        _;
+    }
+
+    function _pause(bool pause_) internal {
+        paused = pause_;
+        emit Pause();
+    }
+
+    function pause(bool pause_) external onlyAdmin {
+        _pause(pause_);
+    }
+}
+
+contract MonthlyBonusDistributor is IBonusDistributor, AdminPausable, DateTime {
     address public bonusToken;
     address public idnft;
     address public multiHonor;
-    uint256 immutable bonusDay;
+    uint256 public immutable bonusDay;
 
     mapping(uint256 => uint256) public historicPoints;
 
-    constructor(address bonusToken_, address idnft_, address multiHonor_) {
+    event SetBonusToken(address bonusToken);
+    event SetIDNFT(address idnft);
+    event SetMultiHonor(address multiHonor);
+    event Withdraw(uint256 amount, address to);
+
+    constructor(
+        address bonusToken_,
+        address idnft_,
+        address multiHonor_
+    ) {
         bonusDay = 15;
+
+        _setAdmin(msg.sender);
+        _setBonusToken(bonusToken_);
+        _setIDNFT(idnft_);
+        _setMultiHonor(multiHonor_);
+    }
+
+    function _setBonusToken(address bonusToken_) internal {
+        bonusToken = bonusToken_;
+        emit SetBonusToken(bonusToken);
+    }
+
+    function _setIDNFT(address idnft_) internal {
+        idnft = idnft_;
+        emit SetIDNFT(idnft);
+    }
+
+    function _setMultiHonor(address multiHonor_) internal {
+        multiHonor = multiHonor_;
+        emit SetMultiHonor(multiHonor);
+    }
+
+    function setBonusToken(address bonusToken_) external onlyAdmin mustPaused {
+        _setBonusToken(bonusToken_);
+    }
+
+    function withdraw(uint256 amount, address to)
+        external
+        onlyAdmin
+        mustPaused
+    {
+        bool succ = IERC20(bonusToken).transfer(to, amount);
+        require(succ);
+        emit Withdraw(amount, to);
     }
 
     function currentMonthStart() public view returns (uint256 time) {
@@ -56,7 +153,7 @@ contract BonusDistributor is IBonusDistributor, DateTime {
             return 0;
         }
         uint256 dpoc = getDpoc(idcard);
-        uint8 decimal; // TODO
+        uint8 decimal = IERC20(bonusToken).decimals();
         amount = dpoc * 10**decimal;
         return amount;
     }
@@ -70,14 +167,18 @@ contract BonusDistributor is IBonusDistributor, DateTime {
     function claim(uint256 idcard, address toAccount)
         external
         override
+        mustNotPaused
         returns (uint256 amount)
     {
-        require(IIDNFT(idnft).ownerOf(idcard) == msg.sender, "bonus distributor: not idcard owner");
+        require(
+            IIDNFT(idnft).ownerOf(idcard) == msg.sender,
+            "bonus distributor: not idcard owner"
+        );
         if (block.timestamp < currentMonthStart() + bonusDay * DAY_IN_SECONDS) {
             return 0;
         }
         uint256 dpoc = getDpoc(idcard);
-        uint8 decimal;
+        uint8 decimal = IERC20(bonusToken).decimals();
         amount = dpoc * 10**decimal;
         bool success = IERC20(bonusToken).transfer(toAccount, amount);
         require(success, "bonus distributor: send bonus token failed");
