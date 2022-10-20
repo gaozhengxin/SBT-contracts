@@ -77,7 +77,7 @@ abstract contract AdminPausable is Administrable {
         emit Pause();
     }
 
-    function pause(bool pause_) external onlyAdmin {
+    function setPaused(bool pause_) external onlyAdmin {
         _pause(pause_);
     }
 }
@@ -100,7 +100,7 @@ contract MonthlyBonusDistributor is IBonusDistributor, AdminPausable, DateTime {
         address idnft_,
         address multiHonor_
     ) {
-        bonusDay = 15;
+        bonusDay = 25;
 
         _setAdmin(msg.sender);
         _setBonusToken(bonusToken_);
@@ -149,7 +149,10 @@ contract MonthlyBonusDistributor is IBonusDistributor, AdminPausable, DateTime {
         override
         returns (uint256 amount)
     {
-        if (block.timestamp < currentMonthStart() + bonusDay * DAY_IN_SECONDS) {
+        if (
+            block.timestamp <
+            currentMonthStart() + (bonusDay - 1) * DAY_IN_SECONDS
+        ) {
             return 0;
         }
         uint256 dpoc = getDpoc(idcard);
@@ -174,7 +177,10 @@ contract MonthlyBonusDistributor is IBonusDistributor, AdminPausable, DateTime {
             IIDNFT(idnft).ownerOf(idcard) == msg.sender,
             "bonus distributor: not idcard owner"
         );
-        if (block.timestamp < currentMonthStart() + bonusDay * DAY_IN_SECONDS) {
+        if (
+            block.timestamp <
+            currentMonthStart() + (bonusDay - 1) * DAY_IN_SECONDS
+        ) {
             return 0;
         }
         uint256 dpoc = getDpoc(idcard);
