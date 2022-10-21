@@ -36,6 +36,7 @@ contract MultiHonor_Multichain is
     AccessControlUpgradeable,
     ILedger
 {
+    /// @dev not required and not allowed if upgrading from v1
     function initialize() public initializer {
         __Context_init_unchained();
         __AccessControl_init_unchained();

@@ -101,6 +101,14 @@ contract MultiHonor_V1 is Initializable, IMultiHonor, AccessControlUpgradeable {
         return this.POC(tokenId, block.timestamp);
     }
 
+    /**
+     * @dev add another POC getter
+     * for hardhat testing doesnt work with overload functions
+     */
+    function POC_2(uint256 tokenId) view external returns(uint64) {
+        return this.POC(tokenId, block.timestamp);
+    }
+
     // returns user's average VEPower in current epoch
     function VEPower(uint256 tokenId) override view external returns(uint256) {
         if (currentVEEpoch() > veInfo[tokenId].epoch) {
