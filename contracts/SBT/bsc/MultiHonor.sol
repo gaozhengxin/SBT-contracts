@@ -111,7 +111,7 @@ contract MultiHonor_Multichain is
     }
 
     // returns user's POC at a specific time after checkpoint
-    function POC(uint256 tokenId, uint256 time) external view returns (uint64) {
+    function POC_at(uint256 tokenId, uint256 time) external view returns (uint64) {
         return
             uint64(
                 uint256(pocInfo[tokenId].POC) -
@@ -124,12 +124,7 @@ contract MultiHonor_Multichain is
 
     // returns user's current POC
     function POC(uint256 tokenId) external view override returns (uint64) {
-        return this.POC(tokenId, block.timestamp);
-    }
-
-    // returns user's current POC
-    function poc(uint256 tokenId) external view returns (uint64) {
-        return this.POC(tokenId, block.timestamp);
+        return this.POC_at(tokenId, block.timestamp);
     }
 
     // returns user's current EventPoint
