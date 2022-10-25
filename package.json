@@ -21,6 +21,7 @@
     "web3": "^1.8.0"
   },
   "dependencies": {
-    "@openzeppelin/contracts-upgradeable": "^4.8.0-rc.1"
+    "@openzeppelin/contracts-upgradeable": "^4.7.3",
+    "dotenv": "^16.0.3"
   }
 }
