@@ -325,6 +325,11 @@ describe("IDNFT V2", function () {
     await mc.receiveMessage(controller.address, owner.address, hre.network.config.chainId, message_merge_3);
     console.log("total supply " + await idnft.totalSupply());
 
+    // claim with blank DID type
+    let defaultType = '0x44656661756c7400000000000000000000000000000000000000000000000000';
+    let tx5 = await controller.claim(defaultType, "0x");
+    await tx5.wait();
+
     // TODO test reuse DID after old ID card is burnt
 
     // TODO test premium holder
