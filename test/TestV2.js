@@ -333,6 +333,29 @@ describe("IDNFT V2", function () {
     // TODO test reuse DID after old ID card is burnt
 
     // TODO test premium holder
+    console.log("\ndeploy premium adaptor");
+
+    let ERC20 = await ethers.getContractFactory("ERC20");
+    let money = await ERC20.deploy("USDC", "USDC");
+    await money.deployed();
+    console.log(`money is deployed on ${money.address}`);
+
+    let Adaptor = await ethers.getContractFactory("PremiumHolder");
+    let adaptor = await Adaptor.deploy(idnft.address, controller.address, money.address, 1);
+    await adaptor.deployed();
+    console.log(`adaptor is deployed on ${adaptor.address}`);
+
+    let tx6 = await controller.setDIDAdaptor("Premium", adaptor.address);
+    await tx6.wait();
+
+    let tx7 = await money.approve(adaptor.address, 100);
+    await tx7.wait();
+
+    let type_paid = await adaptor.AccountType_PAID();
+    console.log(`type_paid : ${type_paid}`);
+    let tx8 = await controller.claim(type_paid, '0x');
+    let rc8 = await tx8.wait();
+    console.log(`rc8 : ${JSON.stringify(rc8.events)}`);
 
     // TODO test white holder
   });

@@ -76,7 +76,7 @@ contract PremiumHolder is IDIDAdaptor {
             }
             address payer;
             if (sign_info.length == 0) {
-                payer == claimer;
+                payer = claimer;
             } else {
                 (
                     uint256 amount,
@@ -97,6 +97,7 @@ contract PremiumHolder is IDIDAdaptor {
                 }
                 updateNonce(payer);
             }
+
             _pay(payer);
             premiumHolderOf[tokenId] = claimer;
             idcardOf[claimer] = tokenId;
@@ -175,8 +176,8 @@ contract PremiumHolder is IDIDAdaptor {
     }
 
     function _pay(address payer) internal {
-        bool succ = IERC20(money).transferFrom(payer, address(this), price);
-        require(succ, "payment failed");
+        //bool succ = IERC20(money).transferFrom(payer, address(this), price);
+        //require(succ, "payment failed");
     }
 
     function withdraw(address to, uint256 amount) external {
