@@ -289,6 +289,7 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
         require(accountTypeOf[tokenId] == bytes32(0));
         if (accountType == AccountType_Default) {
             res = true;
+            return res;
         }
         res = IDIDAdaptor(dIDAdaptor[accountType]).connect(
             tokenId,

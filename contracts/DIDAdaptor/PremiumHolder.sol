@@ -21,7 +21,7 @@ interface IERC20 {
  * PAY MONEY TO BECOME A PREMIUM ID CARD HOLDER.
  */
 contract PremiumHolder is IDIDAdaptor {
-    bytes32 constant AccountType_PAID = keccak256("Premium");
+    bytes32 public constant AccountType_PAID = keccak256("Premium");
     address public idcard;
     address public controller;
     address public money;
@@ -175,7 +175,8 @@ contract PremiumHolder is IDIDAdaptor {
     }
 
     function _pay(address payer) internal {
-        IERC20(money).transferFrom(payer, address(this), price);
+        bool succ = IERC20(money).transferFrom(payer, address(this), price);
+        require(succ, "payment failed");
     }
 
     function withdraw(address to, uint256 amount) external {
