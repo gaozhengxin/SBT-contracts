@@ -10,6 +10,8 @@ interface IDCard {
 }
 
 interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+
     function transferFrom(
         address from,
         address to,
@@ -182,7 +184,7 @@ contract PremiumHolder is IDIDAdaptor {
 
     function withdraw(address to, uint256 amount) external {
         require(msg.sender == operator);
-        IERC20(money).transferFrom(address(this), to, amount);
+        IERC20(money).transfer(to, amount);
         emit Withdraw(to, amount);
     }
 
