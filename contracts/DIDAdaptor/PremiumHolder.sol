@@ -176,8 +176,8 @@ contract PremiumHolder is IDIDAdaptor {
     }
 
     function _pay(address payer) internal {
-        //bool succ = IERC20(money).transferFrom(payer, address(this), price);
-        //require(succ, "payment failed");
+        bool succ = IERC20(money).transferFrom(payer, address(this), price);
+        require(succ, "payment failed");
     }
 
     function withdraw(address to, uint256 amount) external {

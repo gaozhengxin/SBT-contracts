@@ -22,6 +22,8 @@ Call function `verifyAccount(uint256 tokenId)` in the controller contract.
 3. Approve money to the premium adaptor.
 4. Send a transaction to call `claim(bytes32 accountType, bytes memory sign_info)` in the controller contract. `sign_info` is an empty string.
 
+[Example](https://bscscan.com/tx/0xa4e2b5c8d541dd196b46984c805dc7cb03064211b212ad14598f0a64b1a87001)
+
 #### Advanced
 If user transfers his IDNFT to a new wallet, the IDNFT will lose the DID info. Front end program can check the status with `verifyAccount(idnft)` in the controller contract. The new owner can `connect` to a new DID of different types in the controller contract.
 It is also allowed to `disconnect` and `updateAccountInfo`.
