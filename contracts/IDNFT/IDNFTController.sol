@@ -313,6 +313,15 @@ contract IDCard_V2_Controller is AccessControlUpgradeable {
         return IDIDAdaptor(dIDAdaptor[accountType]).verifyAccount(tokenId);
     }
 
+    /// @dev Connect to DID.
+    function connect(
+        uint256 tokenId,
+        bytes32 newAccountType,
+        bytes memory new_sign_info
+    ) public {
+        _connect(tokenId, newAccountType, new_sign_info);
+    }
+
     /// @dev Update idcard's DID.
     function updateAccountInfo(
         uint256 tokenId,
