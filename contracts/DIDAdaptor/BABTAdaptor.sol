@@ -13,7 +13,7 @@ interface IDCard {
     function exists(uint256 tokenId) external view returns (bool);
 }
 
-contract BABTAdaptor is IDIDAdaptor {
+contract BABTAdaptor is IDIDAdaptorOwned {
     bytes32 constant AccountType_Binance = keccak256("BABT");
     address public idcard;
     address public controller;
@@ -27,11 +27,12 @@ contract BABTAdaptor is IDIDAdaptor {
     event ConnectBABT(uint256 tokenId, uint256 babtId);
     event DisconnectBABT(uint256 tokenId, uint256 babtId);
 
-    constructor(
+    function initAdaptor(
         address idcard_,
         address controller_,
         address babt_
-    ) {
+    ) public {
+        require(msg.sender == owner);
         idcard = idcard_;
         controller = controller_;
         babt = babt_;
@@ -50,7 +51,9 @@ contract BABTAdaptor is IDIDAdaptor {
             if (
                 idcardOf[babtId] != 0 && IDCard(idcard).exists(idcardOf[babtId])
             ) {
-                return false;
+                if (verifyAccount(idcardOf[babtId])) {
+                    return false;
+                }
             }
             if (claimer != IBABT(babt).ownerOf(babtId)) {
                 return false;
@@ -66,6 +69,10 @@ contract BABTAdaptor is IDIDAdaptor {
 
     function disconnect(uint256 tokenId) external override returns (bool) {
         require(msg.sender == controller);
+        return _disconnect(tokenId);
+    }
+
+    function _disconnect(uint256 tokenId) internal returns (bool) {
         uint256 babtId = babtOf[tokenId];
         idcardOf[babtId] = 0;
         babtOf[tokenId] = 0;

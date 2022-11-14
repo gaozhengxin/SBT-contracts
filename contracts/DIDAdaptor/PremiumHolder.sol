@@ -22,12 +22,12 @@ interface IERC20 {
 /**
  * PAY MONEY TO BECOME A PREMIUM ID CARD HOLDER.
  */
-contract PremiumHolder is IDIDAdaptor {
+contract PremiumHolder is IDIDAdaptorOwned {
     bytes32 public constant AccountType_PAID = keccak256("Premium");
     address public idcard;
     address public controller;
     address public money;
-    uint256 public immutable price;
+    uint256 public price;
     address public operator;
     uint256 public totalBinding;
 
@@ -47,12 +47,13 @@ contract PremiumHolder is IDIDAdaptor {
     event Withdraw(address to, uint256 amount);
     event TransferOperator(address to);
 
-    constructor(
+    function initAdaptor(
         address idcard_,
         address controller_,
         address money_,
         uint256 price_
-    ) {
+    ) public {
+        require(msg.sender == owner);
         idcard = idcard_;
         controller = controller_;
         money = money_;
@@ -74,7 +75,9 @@ contract PremiumHolder is IDIDAdaptor {
                 idcardOf[claimer] != 0 &&
                 IDCard(idcard).exists(idcardOf[claimer])
             ) {
-                return false;
+                if (verifyAccount(idcardOf[claimer])) {
+                    return false;
+                }
             }
             address payer;
             if (sign_info.length == 0) {
@@ -126,6 +129,10 @@ contract PremiumHolder is IDIDAdaptor {
     /// @notice Disconnect ID card from a premium holder address.
     function disconnect(uint256 tokenId) external override returns (bool) {
         require(msg.sender == controller);
+        return _disconnect(tokenId);
+    }
+
+    function _disconnect(uint256 tokenId) internal returns (bool) {
         address premiumHolder = premiumHolderOf[tokenId];
         idcardOf[premiumHolder] = 0;
         premiumHolderOf[tokenId] = address(0);
