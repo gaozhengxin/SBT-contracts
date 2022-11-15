@@ -56,6 +56,7 @@ contract WhiteHolder is IDIDAdaptorOwned {
     ) public override returns (bool) {
         require(msg.sender == controller);
         if (accountType == AccountType_White) {
+            uint256 dTotalBinding = 1;
             if (
                 idcardOf[claimer] != 0 &&
                 IDCard(idcard).exists(idcardOf[claimer])
@@ -63,11 +64,12 @@ contract WhiteHolder is IDIDAdaptorOwned {
                 if (verifyAccount(idcardOf[claimer])) {
                     return false;
                 }
+                dTotalBinding -= 1;
             }
             if (verify(claimer, sign_info)) {
                 idcardOf[claimer] = tokenId;
                 whiteHolderOf[tokenId] = claimer;
-                totalBinding += 1;
+                totalBinding += dTotalBinding;
                 return true;
             }
         }

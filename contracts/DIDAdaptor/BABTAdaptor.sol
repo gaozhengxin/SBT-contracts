@@ -48,19 +48,21 @@ contract BABTAdaptor is IDIDAdaptorOwned {
         require(msg.sender == controller);
         if (accountType == AccountType_Binance) {
             uint256 babtId = abi.decode(sign_info, (uint256));
+            uint256 dTotalBinding = 1;
             if (
                 idcardOf[babtId] != 0 && IDCard(idcard).exists(idcardOf[babtId])
             ) {
                 if (verifyAccount(idcardOf[babtId])) {
                     return false;
                 }
+                dTotalBinding -= 1;
             }
             if (claimer != IBABT(babt).ownerOf(babtId)) {
                 return false;
             }
             idcardOf[babtId] = tokenId;
             babtOf[tokenId] = babtId;
-            totalBinding += 1;
+            totalBinding += dTotalBinding;
             emit ConnectBABT(tokenId, babtId);
             return true;
         }

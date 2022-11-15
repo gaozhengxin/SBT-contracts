@@ -71,6 +71,7 @@ contract PremiumHolder is IDIDAdaptorOwned {
     ) public override returns (bool) {
         require(msg.sender == controller);
         if (accountType == AccountType_PAID) {
+            uint256 dTotalBinding = 1;
             if (
                 idcardOf[claimer] != 0 &&
                 IDCard(idcard).exists(idcardOf[claimer])
@@ -78,6 +79,7 @@ contract PremiumHolder is IDIDAdaptorOwned {
                 if (verifyAccount(idcardOf[claimer])) {
                     return false;
                 }
+                dTotalBinding -= 1;
             }
             address payer;
             if (sign_info.length == 0) {
@@ -106,7 +108,7 @@ contract PremiumHolder is IDIDAdaptorOwned {
             _pay(payer);
             premiumHolderOf[tokenId] = claimer;
             idcardOf[claimer] = tokenId;
-            totalBinding += 1;
+            totalBinding += dTotalBinding;
             emit ConnectPayer(tokenId, claimer);
             return true;
         }
