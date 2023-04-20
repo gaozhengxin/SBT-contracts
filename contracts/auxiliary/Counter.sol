@@ -72,7 +72,8 @@ contract Non_Trivial_Accumulator is Accumulator {
     }
 
     function getOne(uint256 tokenId) external view override returns (uint256) {
-        if (ISBT(sbt).TotalPoint(tokenId) > 0) {
+        //if (ISBT(sbt).TotalPoint(tokenId) > 0) {
+        if (ISBT(sbt).VEPoint(tokenId) > 0) {
             return 1;
         }
         return 0;
@@ -87,6 +88,7 @@ contract Total_Point_Accumulator is Accumulator {
     }
 
     function getOne(uint256 tokenId) external view override returns (uint256) {
-        return uint256(ISBT(sbt).TotalPoint(tokenId));
+        //return uint256(ISBT(sbt).TotalPoint(tokenId));
+        return uint256(ISBT(sbt).VEPoint(tokenId));
     }
 }

@@ -19,10 +19,10 @@ interface IMultiHonor {
 }
 
 interface IERC721Enumerable {
-    function tokenOfOwnerByIndex(address owner, uint256 index)
-        external
-        view
-        returns (uint256);
+    function tokenOfOwnerByIndex(
+        address owner,
+        uint256 index
+    ) external view returns (uint256);
 }
 
 interface ILedger {
@@ -130,11 +130,13 @@ contract MultiHonor_Multichain is
         // Merge veInfo
         if (veInfo[fromToken].epoch == uint64(currentVEEpoch())) {
             if (veInfo[toToken].epoch == uint64(currentVEEpoch())) {
-                veInfo[toToken].epoch += veInfo[fromToken].epoch;
+                veInfo[toToken].VEPower += veInfo[fromToken].VEPower;
             } else {
                 veInfo[toToken].epoch = veInfo[fromToken].epoch;
+                veInfo[toToken].VEPower = veInfo[fromToken].VEPower;
             }
         }
+        veInfo[fromToken].VEPower = 0;
         // Merge event point
         eventPoint[toToken] += eventPoint[fromToken];
         eventPoint[fromToken] = 0;
@@ -146,11 +148,10 @@ contract MultiHonor_Multichain is
     }
 
     // returns user's POC at a specific time after checkpoint
-    function POC_at(uint256 tokenId, uint256 time)
-        external
-        view
-        returns (uint64)
-    {
+    function POC_at(
+        uint256 tokenId,
+        uint256 time
+    ) external view returns (uint64) {
         return
             uint64(
                 uint256(pocInfo[tokenId].POC) -
@@ -181,12 +182,9 @@ contract MultiHonor_Multichain is
     }
 
     // returns user's current EventPoint
-    function EventPoint(uint256 tokenId)
-        external
-        view
-        override
-        returns (uint64)
-    {
+    function EventPoint(
+        uint256 tokenId
+    ) external view override returns (uint64) {
         return eventPoint[tokenId];
     }
 
@@ -229,12 +227,9 @@ contract MultiHonor_Multichain is
     }
 
     // returns user's total honor
-    function TotalPoint(uint256 tokenId)
-        external
-        view
-        override
-        returns (uint64)
-    {
+    function TotalPoint(
+        uint256 tokenId
+    ) external view override returns (uint64) {
         return
             uint64(
                 (this.POC(tokenId) *
@@ -268,9 +263,10 @@ contract MultiHonor_Multichain is
     }
 
     // @dev set average VE power for current epoch
-    function setVEPower(uint256[] calldata ids, uint256[] calldata vePower)
-        external
-    {
+    function setVEPower(
+        uint256[] calldata ids,
+        uint256[] calldata vePower
+    ) external {
         _checkRole(ROLE_SET_VEPOWER);
         uint256 veepoch = currentVEEpoch();
         for (uint256 i = 0; i < ids.length; i++) {
@@ -280,9 +276,10 @@ contract MultiHonor_Multichain is
         emit SetVEPower(ids, vePower, uint64(veepoch));
     }
 
-    function setEventPoint(uint256[] calldata ids, uint64[] calldata eventPower)
-        external
-    {
+    function setEventPoint(
+        uint256[] calldata ids,
+        uint64[] calldata eventPower
+    ) external {
         _checkRole(ROLE_SET_EVENT);
         for (uint256 i = 0; i < ids.length; i++) {
             eventPoint[ids[i]] = eventPower[i];
@@ -291,9 +288,10 @@ contract MultiHonor_Multichain is
     }
 
     // @dev increase event power
-    function addEventPoint(uint256[] calldata ids, uint64[] calldata eventPower)
-        external
-    {
+    function addEventPoint(
+        uint256[] calldata ids,
+        uint64[] calldata eventPower
+    ) external {
         _checkRole(ROLE_ADD_EVENT);
         for (uint256 i = 0; i < ids.length; i++) {
             uint64 eventPoint_ = this.EventPoint(ids[i]) + eventPower[i];
@@ -303,7 +301,7 @@ contract MultiHonor_Multichain is
     }
 
     function vePower2vePoint(uint256 v) public pure returns (uint256) {
-        return 125 * log_2((v / 1 ether + 1)**2) + (514 * v) / 1 ether / 1000;
+        return 125 * log_2((v / 1 ether + 1) ** 2) + (514 * v) / 1 ether / 1000;
     }
 
     function log_2(uint256 x) public pure returns (uint256 y) {
@@ -318,11 +316,10 @@ contract MultiHonor_Multichain is
         revert("log_2 max loops exceeded");
     }
 
-    function balanceOf(address account, uint256 id)
-        public
-        view
-        returns (uint256 balance)
-    {
+    function balanceOf(
+        address account,
+        uint256 id
+    ) public view returns (uint256 balance) {
         require(
             account != address(0),
             "ERC1155: address zero is not a valid owner"
