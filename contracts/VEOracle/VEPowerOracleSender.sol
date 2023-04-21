@@ -213,7 +213,7 @@ contract VEPowerOracleSender is AnyCallSender {
     function autoDelegate(uint256 ve_id, uint256 dao_id) external payable {
         require(IVE(ve).ownerOf(ve_id) == msg.sender, "only ve owner");
         require(
-            block.timestamp % veEpochLength < veEpochLength - 5 days,
+            block.timestamp % veEpochLength < veEpochLength - 3 days,
             "not in the prepare stage"
         );
         require(msg.value > minAutoDelegateBudget);
