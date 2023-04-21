@@ -3,7 +3,8 @@ const hre = require("hardhat");
 
 const idnftAddress = '0x7a02492bAa66B0b8266a6d25Bbd6D8BA169296CC';
 //const accumulatorAddress = '0x733df3b8c55Eb99EAc66fbD621c9664dD7d9667F';
-const accumulatorAddress = '0x6b1a19d77a76bcC2B3336A7D8049Ec67a39FbA89';
+//const accumulatorAddress = '0x6b1a19d77a76bcC2B3336A7D8049Ec67a39FbA89'; // Total point
+const accumulatorAddress = '0xDD03Dbed9aBdb125f1bdd465CaAdbeFdFF4f7524'; // VE Point
 
 async function main() {
     let idnft = await ethers.getContractAt("IDCard_V2", idnftAddress);
