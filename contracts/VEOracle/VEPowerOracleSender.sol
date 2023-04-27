@@ -74,7 +74,7 @@ abstract contract AnyCallSender is Administrable {
         uint256[] memory chainIDs,
         address[] memory receivers
     ) public onlyAdmin {
-        for (uint i = 0; i < chainIDs.length; i++) {
+        for (uint256 i = 0; i < chainIDs.length; i++) {
             receiver[chainIDs[i]] = receivers[i];
         }
         emit SetReceivers(chainIDs, receivers);
@@ -91,62 +91,51 @@ abstract contract AnyCallSender is Administrable {
         address _fallback,
         uint256 _toChainID,
         uint256 anyCallFee
-    ) internal returns (bool) {
+    ) internal {
         if (flag == 2) {
-            try
-                IAnycallV6Proxy(anyCallProxy).anyCall{value: anyCallFee}(
-                    _to,
-                    _data,
-                    _fallback,
-                    _toChainID,
-                    flag
-                )
-            {
-                return true;
-            } catch {
-                return false;
-            }
+            IAnycallV6Proxy(anyCallProxy).anyCall{value: anyCallFee}(
+                _to,
+                _data,
+                _fallback,
+                _toChainID,
+                flag
+            );
         } else {
-            try
-                IAnycallV6Proxy(anyCallProxy).anyCall(
-                    _to,
-                    _data,
-                    _fallback,
-                    _toChainID,
-                    flag
-                )
-            {
-                return true;
-            } catch {
-                return false;
-            }
+            IAnycallV6Proxy(anyCallProxy).anyCall(
+                _to,
+                _data,
+                _fallback,
+                _toChainID,
+                flag
+            );
         }
-        return false;
     }
 }
 
 struct Point {
     int128 bias;
     int128 slope;
-    uint ts;
-    uint blk;
+    uint256 ts;
+    uint256 blk;
 }
 
 interface IVE {
-    function ownerOf(uint _tokenId) external view returns (address);
+    function ownerOf(uint256 _tokenId) external view returns (address);
 
-    function getApproved(uint tokenId) external view returns (address operator);
+    function getApproved(
+        uint256 tokenId
+    ) external view returns (address operator);
 
     function balanceOfNFTAt(
-        uint _tokenId,
-        uint _t
-    ) external view returns (uint);
+        uint256 _tokenId,
+        uint256 _t
+    ) external view returns (uint256);
 
-    function user_point_epoch(uint tokenId) external view returns (uint);
+    function user_point_epoch(uint256 tokenId) external view returns (uint256);
 
     function user_point_history(
-        uint _tokenId,
-        uint _idx
+        uint256 _tokenId,
+        uint256 _idx
     ) external view returns (Point memory);
 }
 
@@ -158,10 +147,12 @@ contract VEPowerOracleSender is AnyCallSender {
 
     mapping(uint256 => uint256) public bindingDaoIdOf;
     mapping(uint256 => uint256) public autoDelegateBudget;
+    mapping(uint256 => bool) public isInAutoDelegatingList;
     uint256[] public autoDelegateList;
 
-    uint256 constant minAutoDelegateBudget = 1000000 gwei;
-    uint cursor;
+    uint256 constant minAutoDelegateBudget = 0 gwei;
+    uint256 cursor = 0;
+    bool internal doAutoDelegatingLock = false;
 
     event GrantVEPowerOracle(
         uint256 indexed ve_id,
@@ -188,7 +179,13 @@ contract VEPowerOracleSender is AnyCallSender {
         return block.timestamp / veEpochLength;
     }
 
-    function setAutoDelegatePrice(uint _autoDelegatePrice) external onlyAdmin {
+    function getAutoDelegateLength() external view returns (uint256) {
+        return autoDelegateList.length;
+    }
+
+    function setAutoDelegatePrice(
+        uint256 _autoDelegatePrice
+    ) external onlyAdmin {
         autoDelegatePrice = _autoDelegatePrice;
     }
 
@@ -198,16 +195,14 @@ contract VEPowerOracleSender is AnyCallSender {
     /// @param dao_id dao id
     /// Receiver will update DAO user's VE point
     /// Receiver will prevent double granting
-    function delegateVEPower(
-        uint256 ve_id,
-        uint256 dao_id
-    ) external payable returns (bool) {
+    function delegateVEPower(uint256 ve_id, uint256 dao_id) external payable {
         require(IVE(ve).ownerOf(ve_id) == msg.sender, "only ve owner");
-        return _delegateVEPower(ve_id, dao_id, msg.value);
+        _delegateVEPower(ve_id, dao_id, msg.value);
     }
 
     function isAutoDelegating(uint256 ve_id) external view returns (bool) {
-        return (autoDelegateBudget[ve_id] > minAutoDelegateBudget);
+        return (isInAutoDelegatingList[ve_id] &&
+            autoDelegateBudget[ve_id] >= minAutoDelegateBudget);
     }
 
     function autoDelegate(uint256 ve_id, uint256 dao_id) external payable {
@@ -216,10 +211,11 @@ contract VEPowerOracleSender is AnyCallSender {
             block.timestamp % veEpochLength < veEpochLength - 3 days,
             "not in the prepare stage"
         );
-        require(msg.value > minAutoDelegateBudget);
+        require(msg.value >= minAutoDelegateBudget);
         bindingDaoIdOf[ve_id] = dao_id;
-        if (autoDelegateBudget[ve_id] == 0) {
+        if (isInAutoDelegatingList[ve_id] == false) {
             autoDelegateList.push(ve_id);
+            isInAutoDelegatingList[ve_id] = true;
         }
         autoDelegateBudget[ve_id] += msg.value;
     }
@@ -232,37 +228,44 @@ contract VEPowerOracleSender is AnyCallSender {
     }
 
     function doAutoDelegating(uint256 anycallFee, uint256 length) external {
+        require(doAutoDelegatingLock == false);
+        doAutoDelegatingLock = true;
         require(
             block.timestamp % veEpochLength >= veEpochLength - 3 days,
             "not in the delegate stage"
         );
-        uint256 cnt = 0;
-        for (uint i = 0; i < length; i++) {
-            uint ve_id = autoDelegateList[cursor + i];
+        uint256 start = cursor;
+        uint256 end = cursor + length;
+        if (cursor + length >= autoDelegateList.length) {
+            end = autoDelegateList.length;
+            cursor = 0;
+        } else {
+            cursor = end;
+        }
+        uint256 successCnt = 0;
+        for (uint256 i = start; i < end; i++) {
+            uint256 ve_id = autoDelegateList[i];
             if (autoDelegateBudget[ve_id] >= minAutoDelegateBudget) {
-                bool res = _delegateVEPower(
-                    ve_id,
-                    bindingDaoIdOf[ve_id],
-                    anycallFee
-                );
-                if (res) {
-                    autoDelegateBudget[ve_id] -= autoDelegatePrice;
-                    cnt++;
+                _delegateVEPower(ve_id, bindingDaoIdOf[ve_id], anycallFee);
+                if (autoDelegateBudget[ve_id] < autoDelegatePrice) {
+                    continue;
                 }
+                autoDelegateBudget[ve_id] -= autoDelegatePrice;
+                successCnt++;
             }
         }
-        cursor += length;
         cursor %= autoDelegateList.length;
-        uint reward = cnt * (autoDelegatePrice - anycallFee);
+        uint256 reward = successCnt * (autoDelegatePrice - anycallFee);
         (bool succ, ) = msg.sender.call{value: reward}("");
         require(succ);
+        doAutoDelegatingLock = false;
     }
 
     function _delegateVEPower(
         uint256 ve_id,
         uint256 dao_id,
         uint256 anycallFee
-    ) internal returns (bool) {
+    ) internal {
         uint256 power = calcAvgVEPower(ve_id);
 
         bytes memory data = abi.encode(
@@ -272,30 +275,27 @@ contract VEPowerOracleSender is AnyCallSender {
             uint256(block.timestamp)
         );
 
-        bool res = _anyCall(
+        _anyCall(
             receiver[daoChainID],
             data,
             address(this),
             daoChainID,
             anycallFee
         );
-        if (res) {
-            emit GrantVEPowerOracle(ve_id, dao_id, power);
-        }
-        return res;
+        emit GrantVEPowerOracle(ve_id, dao_id, power);
     }
 
     function calcAvgVEPower(
         uint256 ve_id
     ) public view returns (uint256 avgPower) {
-        uint t_0 = currentEpoch() * veEpochLength;
-        uint interval = veEpochLength / 6;
-        uint rand_i;
-        uint p_i;
-        uint t_i;
-        uint sum_p;
+        uint256 t_0 = currentEpoch() * veEpochLength;
+        uint256 interval = veEpochLength / 6;
+        uint256 rand_i;
+        uint256 p_i;
+        uint256 t_i;
+        uint256 sum_p;
 
-        for (uint i = 0; i < 6; i++) {
+        for (uint256 i = 0; i < 6; i++) {
             rand_i =
                 uint256(keccak256(abi.encodePacked(i, ve_id, currentEpoch()))) %
                 1000;
@@ -307,21 +307,24 @@ contract VEPowerOracleSender is AnyCallSender {
         return sum_p / 6;
     }
 
-    function getPower(uint ve_id, uint t) public view returns (uint256 p) {
-        int bias_0;
-        uint pts_0;
-        int bias_1;
-        uint pts_1;
-        uint userVEEpoch = IVE(ve).user_point_epoch(ve_id);
+    function getPower(
+        uint256 ve_id,
+        uint256 t
+    ) public view returns (uint256 p) {
+        int256 bias_0;
+        uint256 pts_0;
+        int256 bias_1;
+        uint256 pts_1;
+        uint256 userVEEpoch = IVE(ve).user_point_epoch(ve_id);
 
         if (t >= block.timestamp) {
             p = IVE(ve).balanceOfNFTAt(ve_id, t);
         } else {
-            bias_1 = int(IVE(ve).balanceOfNFTAt(ve_id, block.timestamp));
+            bias_1 = int256(IVE(ve).balanceOfNFTAt(ve_id, block.timestamp));
             pts_1 = block.timestamp;
             Point memory point;
 
-            for (uint idx = userVEEpoch; idx >= 0; idx--) {
+            for (uint256 idx = userVEEpoch; idx >= 0; idx--) {
                 point = IVE(ve).user_point_history(ve_id, idx);
                 if (point.ts >= t) {
                     bias_1 = point.bias;
