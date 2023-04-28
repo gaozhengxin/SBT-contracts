@@ -120,6 +120,13 @@ contract MultiHonor_Multichain is
 
     address public controller;
 
+    // ======== team poc upgrade ========
+    mapping(uint256 => POCInfo) private teampocInfo;
+
+    event SetPoc(uint256[] ids, uint64[] poc);
+    event AddPOC(uint256[] ids, uint64[] poc);
+    // ==================================
+
     function merge(uint256 fromToken, uint256 toToken) external override {
         require(msg.sender == controller);
         // Merge POC
@@ -127,6 +134,13 @@ contract MultiHonor_Multichain is
         pocInfo[toToken].timestamp = uint64(block.timestamp);
         pocInfo[fromToken].POC = 0;
         pocInfo[fromToken].timestamp = uint64(block.timestamp);
+        // Merge team POC
+        teampocInfo[toToken].POC =
+            this.TeamPOC(toToken) +
+            this.TeamPOC(fromToken);
+        teampocInfo[toToken].timestamp = uint64(block.timestamp);
+        teampocInfo[fromToken].POC = 0;
+        teampocInfo[fromToken].timestamp = uint64(block.timestamp);
         // Merge veInfo
         if (veInfo[fromToken].epoch == uint64(currentVEEpoch())) {
             if (veInfo[toToken].epoch == uint64(currentVEEpoch())) {
@@ -165,6 +179,24 @@ contract MultiHonor_Multichain is
     // returns user's current POC
     function POC(uint256 tokenId) external view override returns (uint64) {
         return this.POC_at(tokenId, block.timestamp);
+    }
+
+    function TeamPOC(uint256 tokenId) external view returns (uint64) {
+        return this.TeamPOC_at(tokenId, block.timestamp);
+    }
+
+    function TeamPOC_at(
+        uint256 tokenId,
+        uint256 time
+    ) external view returns (uint64) {
+        return
+            uint64(
+                uint256(teampocInfo[tokenId].POC) -
+                    (uint256(time - teampocInfo[tokenId].timestamp) * k) /
+                    k_denominator
+            );
+        // Non linear attenuation
+        // return p / (time - (pocInfo[tokenId].POCTimestamp - p / pocInfo[tokenId].POC));
     }
 
     // returns user's average VEPower in current epoch
@@ -260,6 +292,25 @@ contract MultiHonor_Multichain is
             pocInfo[ids[i]].timestamp = uint64(block.timestamp);
         }
         emit AddPOC(ids, poc);
+    }
+
+    function setTeamPOC(uint256[] calldata ids, uint64[] calldata poc) external {
+        _checkRole(ROLE_SET_POC);
+        for (uint256 i = 0; i < ids.length; i++) {
+            teampocInfo[ids[i]].POC = poc[i];
+            teampocInfo[ids[i]].timestamp = uint64(block.timestamp);
+        }
+        emit SetTeamPoc(ids, poc);
+    }
+
+    function addTeamPOC(uint256[] calldata ids, uint64[] calldata poc) external {
+        _checkRole(ROLE_ADD_POC);
+        for (uint256 i = 0; i < ids.length; i++) {
+            uint64 poc_ = this.POC(ids[i]) + poc[i];
+            teampocInfo[ids[i]].POC = poc_;
+            teampocInfo[ids[i]].timestamp = uint64(block.timestamp);
+        }
+        emit AddTeamPOC(ids, poc);
     }
 
     // @dev set average VE power for current epoch
