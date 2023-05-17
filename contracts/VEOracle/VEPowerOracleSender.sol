@@ -208,7 +208,7 @@ contract VEPowerOracleSender is AnyCallSender {
     function autoDelegate(uint256 ve_id, uint256 dao_id) external payable {
         require(IVE(ve).ownerOf(ve_id) == msg.sender, "only ve owner");
         require(
-            block.timestamp % veEpochLength < veEpochLength - 3 days,
+            block.timestamp % veEpochLength > 3 days,
             "not in the prepare stage"
         );
         require(msg.value >= minAutoDelegateBudget);
@@ -231,7 +231,7 @@ contract VEPowerOracleSender is AnyCallSender {
         require(doAutoDelegatingLock == false);
         doAutoDelegatingLock = true;
         require(
-            block.timestamp % veEpochLength >= veEpochLength - 3 days,
+            block.timestamp % veEpochLength <= 3 days,
             "not in the delegate stage"
         );
         uint256 start = cursor;
@@ -286,7 +286,7 @@ contract VEPowerOracleSender is AnyCallSender {
     }
 
     function calcAvgVEPower(
-        uint256 ve_id
+        uint256 ve_id,
     ) public view returns (uint256 avgPower) {
         uint256 t_0 = currentEpoch() * veEpochLength;
         uint256 interval = veEpochLength / 6;
